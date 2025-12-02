@@ -9,6 +9,8 @@ mkdir -p /var/www/html/storage/framework/cache
 mkdir -p /var/www/html/storage/framework/sessions
 mkdir -p /var/www/html/storage/framework/views
 mkdir -p /var/www/html/bootstrap/cache
+mkdir -p /var/log/nginx
+mkdir -p /var/log/supervisor
 
 # Configurer les permissions
 chown -R www-data:www-data /var/www/html/storage

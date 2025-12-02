@@ -59,7 +59,7 @@ RUN npm run build
 # Les scripts Laravel seront exécutés dans l'entrypoint quand .env sera disponible
 
 # Créer le répertoire docker s'il n'existe pas
-RUN mkdir -p /etc/nginx/conf.d /etc/supervisor/conf.d /var/log/supervisor
+RUN mkdir -p /etc/nginx/conf.d /etc/supervisor/conf.d /var/log/supervisor /var/log/nginx
 
 # Copier la configuration Nginx
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
