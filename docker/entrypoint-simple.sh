@@ -47,9 +47,18 @@ if [ -z "$DB_DATABASE" ] && [ -n "$PGDATABASE" ]; then
     echo "✅ DB_DATABASE mappé depuis PGDATABASE: $DB_DATABASE" >&2
 fi
 
-if [ -z "$DB_USERNAME" ] && [ -n "$PGUSER" ]; then
-    export DB_USERNAME="$PGUSER"
-    echo "✅ DB_USERNAME mappé depuis PGUSER: $DB_USERNAME" >&2
+if [ -z "$DB_USERNAME" ]; then
+    if [ -n "$POSTGRES_USER" ]; then
+        export DB_USERNAME="$POSTGRES_USER"
+        echo "✅ DB_USERNAME mappé depuis POSTGRES_USER: $DB_USERNAME" >&2
+    elif [ -n "$PGUSER" ]; then
+        export DB_USERNAME="$PGUSER"
+        echo "✅ DB_USERNAME mappé depuis PGUSER: $DB_USERNAME" >&2
+    else
+        # Valeur par défaut standard pour PostgreSQL
+        export DB_USERNAME="postgres"
+        echo "⚠️  DB_USERNAME non trouvé dans les variables, utilisation de la valeur par défaut: postgres" >&2
+    fi
 fi
 
 if [ -z "$DB_PASSWORD" ] && [ -n "$PGPASSWORD" ]; then
@@ -57,10 +66,20 @@ if [ -z "$DB_PASSWORD" ] && [ -n "$PGPASSWORD" ]; then
     echo "✅ DB_PASSWORD mappé depuis PGPASSWORD (masquée)" >&2
 fi
 
-# Si DATABASE_URL est défini, l'utiliser
-if [ -z "$DB_HOST" ] && [ -n "$DATABASE_URL" ]; then
-    echo "✅ Utilisation de DATABASE_URL pour la connexion" >&2
+# Si DATABASE_URL est défini, l'utiliser (priorité)
+if [ -n "$DATABASE_URL" ]; then
+    echo "✅ DATABASE_URL trouvé, utilisation pour la connexion" >&2
     export DB_URL="$DATABASE_URL"
+    # Essayer de parser DATABASE_URL pour extraire les variables individuelles si elles manquent
+    if [ -z "$DB_HOST" ] || [ -z "$DB_USERNAME" ]; then
+        echo "📝 Extraction des informations depuis DATABASE_URL..." >&2
+    fi
+fi
+
+# Utiliser aussi DATABASE_PUBLIC_URL si disponible (Railway)
+if [ -n "$DATABASE_PUBLIC_URL" ] && [ -z "$DATABASE_URL" ]; then
+    echo "✅ DATABASE_PUBLIC_URL trouvé, utilisation pour la connexion" >&2
+    export DB_URL="$DATABASE_PUBLIC_URL"
 fi
 
 # S'assurer que DB_CONNECTION est défini
@@ -69,9 +88,18 @@ if [ -z "$DB_CONNECTION" ]; then
     echo "✅ DB_CONNECTION défini à: pgsql" >&2
 fi
 
-# Afficher les variables d'environnement de base de données
+# Afficher les variables d'environnement de base de données (y compris les variables Railway disponibles)
 echo "==========================================" >&2
-echo "🔍 Variables d'environnement de base de données:" >&2
+echo "🔍 Variables d'environnement disponibles:" >&2
+echo "PGHOST: ${PGHOST:-non définie}" >&2
+echo "PGPORT: ${PGPORT:-non définie}" >&2
+echo "PGDATABASE: ${PGDATABASE:-non définie}" >&2
+echo "PGUSER: ${PGUSER:-non définie}" >&2
+echo "PGPASSWORD: ${PGPASSWORD:+définie (masquée)}" >&2
+echo "POSTGRES_USER: ${POSTGRES_USER:-non définie}" >&2
+echo "POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:+définie (masquée)}" >&2
+echo "==========================================" >&2
+echo "🔍 Variables Laravel mappées:" >&2
 echo "DB_CONNECTION: ${DB_CONNECTION:-non définie}" >&2
 echo "DB_HOST: ${DB_HOST:-non définie}" >&2
 echo "DB_PORT: ${DB_PORT:-non définie}" >&2
@@ -88,24 +116,21 @@ max_attempts=30
 attempt=0
 
 while [ $attempt -lt $max_attempts ]; do
-    if php -r "
-    try {
-        \$pdo = new PDO(
-            'pgsql:host=' . getenv('DB_HOST') . ';port=' . getenv('DB_PORT') . ';dbname=' . getenv('DB_DATABASE'),
-            getenv('DB_USERNAME'),
-            getenv('DB_PASSWORD')
-        );
-        echo 'OK';
-    } catch (Exception \$e) {
-        exit(1);
-    }
-    " > /dev/null 2>&1; then
-        echo "✅ Base de données connectée!" >&2
+    CONNECTION_RESULT=$(php /var/www/html/docker/test-db-connection.php 2>&1)
+    
+    if echo "$CONNECTION_RESULT" | grep -q "OK"; then
+        echo "✅ Base de données connectée! ($CONNECTION_RESULT)" >&2
         break
+    else
+        attempt=$((attempt + 1))
+        if [ $attempt -le 3 ] || [ $attempt -eq $max_attempts ]; then
+            echo "Tentative $attempt/$max_attempts..." >&2
+            echo "   Détails: $CONNECTION_RESULT" >&2
+        else
+            echo "Tentative $attempt/$max_attempts..." >&2
+        fi
+        sleep 2
     fi
-    attempt=$((attempt + 1))
-    echo "Tentative $attempt/$max_attempts..." >&2
-    sleep 2
 done
 
 if [ $attempt -eq $max_attempts ]; then
