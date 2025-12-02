@@ -1,11 +1,8 @@
-FROM php:8.2-fpm-alpine
+FROM php:8.2-cli-alpine
 
 # Installer les dépendances système
 RUN apk add --no-cache \
-    nginx \
-    supervisor \
     postgresql-dev \
-    mysql-client \
     nodejs \
     npm \
     git \
@@ -58,23 +55,8 @@ RUN npm run build
 # Note: L'autoloader est déjà optimisé avec --optimize-autoloader lors de composer install
 # Les scripts Laravel seront exécutés dans l'entrypoint quand .env sera disponible
 
-# Créer le répertoire docker s'il n'existe pas
-RUN mkdir -p /etc/nginx/conf.d /etc/supervisor/conf.d /var/log/supervisor /var/log/nginx
-
-# Copier la configuration Nginx principale
-COPY docker/nginx-main.conf /etc/nginx/nginx.conf
-
-# Copier la configuration Nginx du serveur
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copier la configuration Supervisor
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Copier la configuration PHP-FPM
-COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
-
-# Copier le script d'entrypoint
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+# Copier le script d'entrypoint simplifié
+COPY docker/entrypoint-simple.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Configurer les permissions
@@ -83,7 +65,7 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
 # Exposer le port
-EXPOSE 80
+EXPOSE 8000
 
 # Utiliser le script d'entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
