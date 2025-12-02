@@ -55,8 +55,8 @@ COPY . .
 # Builder les assets frontend (Vite)
 RUN npm run build
 
-# Exécuter les scripts post-installation
-RUN composer dump-autoload --optimize
+# Note: L'autoloader est déjà optimisé avec --optimize-autoloader lors de composer install
+# Les scripts Laravel seront exécutés dans l'entrypoint quand .env sera disponible
 
 # Créer le répertoire docker s'il n'existe pas
 RUN mkdir -p /etc/nginx/conf.d /etc/supervisor/conf.d /var/log/supervisor

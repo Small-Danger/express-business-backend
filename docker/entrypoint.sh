@@ -43,6 +43,10 @@ php artisan migrate --force || echo "⚠️  Erreur lors des migrations, mais on
 echo "🔗 Création du lien symbolique storage..."
 php artisan storage:link || echo "⚠️  Le lien storage existe déjà ou erreur"
 
+# Découvrir les packages Laravel (nécessaire après composer install --no-scripts)
+echo "📦 Découverte des packages Laravel..."
+php artisan package:discover --ansi || true
+
 # Optimiser Laravel pour la production
 echo "⚡ Optimisation de Laravel..."
 php artisan config:cache || true
