@@ -52,6 +52,9 @@ COPY . .
 # Builder les assets frontend (Vite)
 RUN npm run build
 
+# Supprimer tous les caches qui pourraient avoir été créés pendant le build
+RUN rm -rf bootstrap/cache/*.php storage/framework/cache/* storage/framework/views/* || true
+
 # Note: L'autoloader est déjà optimisé avec --optimize-autoloader lors de composer install
 # Les scripts Laravel seront exécutés dans l'entrypoint quand .env sera disponible
 

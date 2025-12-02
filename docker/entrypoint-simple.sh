@@ -57,12 +57,16 @@ if [ $attempt -eq $max_attempts ]; then
     echo "⚠️  Impossible de se connecter à la base de données, mais on continue..."
 fi
 
-# Vider les caches existants
-echo "🧹 Nettoyage des caches..."
+# Vider TOUS les caches existants (y compris les fichiers de cache)
+echo "🧹 Nettoyage complet des caches..."
+rm -rf /var/www/html/bootstrap/cache/*.php || true
+rm -rf /var/www/html/storage/framework/cache/* || true
+rm -rf /var/www/html/storage/framework/views/* || true
 php artisan config:clear || true
 php artisan route:clear || true
 php artisan view:clear || true
 php artisan cache:clear || true
+php artisan optimize:clear || true
 
 # Découvrir les packages Laravel
 echo "📦 Découverte des packages Laravel..."
