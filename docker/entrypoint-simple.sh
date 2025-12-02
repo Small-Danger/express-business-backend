@@ -57,6 +57,13 @@ if [ $attempt -eq $max_attempts ]; then
     echo "⚠️  Impossible de se connecter à la base de données, mais on continue..."
 fi
 
+# Vider les caches existants
+echo "🧹 Nettoyage des caches..."
+php artisan config:clear || true
+php artisan route:clear || true
+php artisan view:clear || true
+php artisan cache:clear || true
+
 # Découvrir les packages Laravel
 echo "📦 Découverte des packages Laravel..."
 php artisan package:discover --ansi || true
@@ -69,11 +76,12 @@ php artisan migrate --force || echo "⚠️  Erreur lors des migrations, mais on
 echo "🔗 Création du lien symbolique storage..."
 php artisan storage:link || echo "⚠️  Le lien storage existe déjà ou erreur"
 
-# Optimiser Laravel pour la production
+# Optimiser Laravel pour la production (sans config:cache pour éviter l'erreur env)
 echo "⚡ Optimisation de Laravel..."
-php artisan config:cache || true
 php artisan route:cache || true
 php artisan view:cache || true
+# Ne pas mettre en cache la config pour éviter l'erreur "Class env does not exist"
+# php artisan config:cache || true
 
 # Démarrer le serveur PHP intégré
 echo "✅ Application prête! Démarrage du serveur..."
