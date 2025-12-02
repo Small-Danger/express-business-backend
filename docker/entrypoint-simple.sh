@@ -30,6 +30,45 @@ else
     echo "✅ APP_KEY est défini" >&2
 fi
 
+# Mapper automatiquement les variables Railway PostgreSQL vers Laravel DB_*
+# Railway fournit PGHOST, PGPORT, etc. mais Laravel attend DB_HOST, DB_PORT, etc.
+if [ -z "$DB_HOST" ] && [ -n "$PGHOST" ]; then
+    export DB_HOST="$PGHOST"
+    echo "✅ DB_HOST mappé depuis PGHOST: $DB_HOST" >&2
+fi
+
+if [ -z "$DB_PORT" ] && [ -n "$PGPORT" ]; then
+    export DB_PORT="$PGPORT"
+    echo "✅ DB_PORT mappé depuis PGPORT: $DB_PORT" >&2
+fi
+
+if [ -z "$DB_DATABASE" ] && [ -n "$PGDATABASE" ]; then
+    export DB_DATABASE="$PGDATABASE"
+    echo "✅ DB_DATABASE mappé depuis PGDATABASE: $DB_DATABASE" >&2
+fi
+
+if [ -z "$DB_USERNAME" ] && [ -n "$PGUSER" ]; then
+    export DB_USERNAME="$PGUSER"
+    echo "✅ DB_USERNAME mappé depuis PGUSER: $DB_USERNAME" >&2
+fi
+
+if [ -z "$DB_PASSWORD" ] && [ -n "$PGPASSWORD" ]; then
+    export DB_PASSWORD="$PGPASSWORD"
+    echo "✅ DB_PASSWORD mappé depuis PGPASSWORD (masquée)" >&2
+fi
+
+# Si DATABASE_URL est défini, l'utiliser
+if [ -z "$DB_HOST" ] && [ -n "$DATABASE_URL" ]; then
+    echo "✅ Utilisation de DATABASE_URL pour la connexion" >&2
+    export DB_URL="$DATABASE_URL"
+fi
+
+# S'assurer que DB_CONNECTION est défini
+if [ -z "$DB_CONNECTION" ]; then
+    export DB_CONNECTION="pgsql"
+    echo "✅ DB_CONNECTION défini à: pgsql" >&2
+fi
+
 # Afficher les variables d'environnement de base de données
 echo "==========================================" >&2
 echo "🔍 Variables d'environnement de base de données:" >&2
@@ -39,6 +78,7 @@ echo "DB_PORT: ${DB_PORT:-non définie}" >&2
 echo "DB_DATABASE: ${DB_DATABASE:-non définie}" >&2
 echo "DB_USERNAME: ${DB_USERNAME:-non définie}" >&2
 echo "DB_PASSWORD: ${DB_PASSWORD:+définie (masquée)}" >&2
+echo "DATABASE_URL: ${DATABASE_URL:+définie (masquée)}" >&2
 echo "PORT: ${PORT:-8000}" >&2
 echo "==========================================" >&2
 
@@ -69,7 +109,14 @@ while [ $attempt -lt $max_attempts ]; do
 done
 
 if [ $attempt -eq $max_attempts ]; then
-    echo "⚠️  Impossible de se connecter à la base de données, mais on continue..." >&2
+    echo "❌ Impossible de se connecter à la base de données après $max_attempts tentatives!" >&2
+    echo "⚠️  Vérifiez que:" >&2
+    echo "   1. Le service Postgres est démarré dans Railway" >&2
+    echo "   2. Les variables d'environnement sont correctement configurées:" >&2
+    echo "      - DB_CONNECTION=pgsql" >&2
+    echo "      - DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD" >&2
+    echo "   3. Le service Postgres est lié au service backend dans Railway" >&2
+    exit 1
 fi
 
 # Vider TOUS les caches existants MANUELLEMENT (avant d'utiliser artisan)
@@ -134,16 +181,30 @@ php artisan package:discover --ansi --no-interaction 2>&1 || {
 
 # Exécuter les migrations
 echo "=== MIGRATE ===" >&2
-php artisan migrate --force --no-interaction 2>&1 || {
-    echo "⚠️  Erreur lors des migrations, mais on continue..." >&2
-    tail -n 30 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
-}
+php artisan migrate --force --no-interaction 2>&1
+MIGRATE_EXIT_CODE=$?
 
-# Vérifier si la table cache existe, sinon exécuter la migration spécifique
-echo "=== VÉRIFICATION TABLE CACHE ===" >&2
-php artisan migrate --path=database/migrations/0001_01_01_000001_create_cache_table.php --force --no-interaction 2>&1 || {
-    echo "⚠️  La migration de la table cache a peut-être déjà été exécutée ou a échoué" >&2
-}
+if [ $MIGRATE_EXIT_CODE -ne 0 ]; then
+    echo "❌ Les migrations ont échoué avec le code $MIGRATE_EXIT_CODE" >&2
+    echo "📋 Détails de l'erreur:" >&2
+    tail -n 50 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
+    echo "" >&2
+    echo "⚠️  VÉRIFICATIONS À FAIRE DANS RAILWAY:" >&2
+    echo "   1. Allez dans votre projet Railway" >&2
+    echo "   2. Cliquez sur le service Postgres" >&2
+    echo "   3. Allez dans l'onglet 'Variables'" >&2
+    echo "   4. Vérifiez que les variables suivantes sont définies dans le service backend:" >&2
+    echo "      - DB_CONNECTION=pgsql" >&2
+    echo "      - DB_HOST (copié depuis Postgres -> Variables -> PGHOST)" >&2
+    echo "      - DB_PORT (copié depuis Postgres -> Variables -> PGPORT)" >&2
+    echo "      - DB_DATABASE (copié depuis Postgres -> Variables -> PGDATABASE)" >&2
+    echo "      - DB_USERNAME (copié depuis Postgres -> Variables -> PGUSER)" >&2
+    echo "      - DB_PASSWORD (copié depuis Postgres -> Variables -> PGPASSWORD)" >&2
+    echo "" >&2
+    echo "   OU utilisez la fonction 'Connect' de Railway qui génère automatiquement ces variables" >&2
+else
+    echo "✅ Migrations exécutées avec succès" >&2
+fi
 
 # Créer le lien symbolique pour le storage
 echo "=== STORAGE:LINK ===" >&2
