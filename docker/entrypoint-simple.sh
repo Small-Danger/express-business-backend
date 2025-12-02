@@ -87,8 +87,9 @@ rm -rf /var/www/html/storage/framework/sessions/* 2>/dev/null || true
 rm -rf /var/www/html/storage/framework/cache/*.php 2>/dev/null || true
 
 # Régénérer l'autoloader pour s'assurer qu'il est à jour
+# Désactiver les scripts pour éviter que package:discover ne crée des fichiers corrompus
 echo "🔄 Régénération de l'autoloader..." >&2
-composer dump-autoload --no-interaction --optimize --classmap-authoritative 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
+COMPOSER_DISABLE_XDEBUG_WARN=1 composer dump-autoload --no-interaction --optimize --classmap-authoritative --no-scripts 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
 
 # Maintenant on peut utiliser artisan (les caches sont supprimés)
 echo "🧹 Nettoyage des caches Laravel..." >&2
@@ -130,5 +131,8 @@ echo "🌐 Serveur accessible sur le port $PORT" >&2
 # Utiliser le serveur PHP intégré directement avec un router personnalisé
 # Cela évite les problèmes de cache Laravel avec artisan serve
 # -t spécifie le répertoire racine du serveur (public)
+echo "🚀 Démarrage du serveur PHP sur 0.0.0.0:$PORT..." >&2
+
+# Utiliser exec pour que le processus serveur devienne PID 1 (important pour Railway)
 exec php -S 0.0.0.0:$PORT -t /var/www/html/public /var/www/html/docker/router.php
 
