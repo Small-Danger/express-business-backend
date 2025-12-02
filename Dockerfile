@@ -61,8 +61,9 @@ RUN rm -rf bootstrap/cache storage/framework/cache/* storage/framework/views/* |
 # Note: L'autoloader est déjà optimisé avec --optimize-autoloader lors de composer install
 # Les scripts Laravel seront exécutés dans l'entrypoint quand .env sera disponible
 
-# Copier le script d'entrypoint simplifié
+# Copier le script d'entrypoint simplifié et le router PHP
 COPY docker/entrypoint-simple.sh /usr/local/bin/entrypoint.sh
+COPY docker/router.php /var/www/html/docker/router.php
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Configurer les permissions

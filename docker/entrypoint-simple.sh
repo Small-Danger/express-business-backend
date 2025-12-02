@@ -127,7 +127,8 @@ fi
 echo "✅ Application prête! Démarrage du serveur..." >&2
 echo "🌐 Serveur accessible sur le port $PORT" >&2
 
-# Utiliser exec pour que le processus serveur devienne PID 1
-# Cela permet à Railway de détecter correctement si le conteneur crash
-exec php artisan serve --host=0.0.0.0 --port=$PORT
+# Utiliser le serveur PHP intégré directement avec un router personnalisé
+# Cela évite les problèmes de cache Laravel avec artisan serve
+# -t spécifie le répertoire racine du serveur (public)
+exec php -S 0.0.0.0:$PORT -t /var/www/html/public /var/www/html/docker/router.php
 
