@@ -13,14 +13,6 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        // Ne pas créer d'utilisateurs de test en production
-        if (app()->environment('production')) {
-            $this->command->warn('⚠️  Mode PRODUCTION détecté. Les utilisateurs de test ne seront PAS créés.');
-            $this->command->info('Créez vos utilisateurs de production manuellement via la commande: php artisan tinker');
-            $this->command->info('Ou utilisez l\'interface d\'administration après avoir créé le premier utilisateur admin.');
-            return;
-        }
-
         // Créer un utilisateur admin (développement/test uniquement)
         User::firstOrCreate(
             ['email' => 'admin@express-business.com'],
