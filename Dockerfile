@@ -3,6 +3,7 @@ FROM php:8.2-cli-alpine
 # Installer les dépendances système
 RUN apk add --no-cache \
     postgresql-dev \
+    postgresql-client \
     nodejs \
     npm \
     git \
@@ -16,17 +17,22 @@ RUN apk add --no-cache \
     libxml2-dev \
     libzip-dev
 
-# Installer les extensions PHP
+# Installer les extensions PHP (pdo_pgsql en premier pour s'assurer qu'il est installé)
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
     pdo \
-    pdo_mysql \
     pdo_pgsql \
+    pdo_mysql \
     gd \
     mbstring \
     xml \
     zip \
     opcache
+
+# Vérifier que l'extension PostgreSQL est bien installée et activée
+RUN php -m | grep -i pdo_pgsql || (echo "❌ Extension pdo_pgsql non trouvée!" && echo "Extensions disponibles:" && php -m && exit 1) \
+    && echo "✅ Extension pdo_pgsql installée et activée" \
+    && php -r "if (!extension_loaded('pdo_pgsql')) { echo '❌ Extension non chargée au runtime!'; exit(1); } else { echo '✅ Extension chargée au runtime'; }"
 
 # Installer Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

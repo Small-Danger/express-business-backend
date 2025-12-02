@@ -4,6 +4,12 @@
  * Utilise DATABASE_URL en priorité, puis les variables individuelles
  */
 
+// Vérifier que l'extension PostgreSQL est chargée
+if (!extension_loaded('pdo_pgsql')) {
+    echo "ERROR: Extension pdo_pgsql non chargée. Extensions disponibles: " . implode(', ', get_loaded_extensions());
+    exit(1);
+}
+
 $databaseUrl = getenv('DATABASE_URL') ?: getenv('DATABASE_PUBLIC_URL');
 
 if ($databaseUrl) {

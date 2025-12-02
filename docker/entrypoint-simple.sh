@@ -110,6 +110,28 @@ echo "DATABASE_URL: ${DATABASE_URL:+définie (masquée)}" >&2
 echo "PORT: ${PORT:-8000}" >&2
 echo "==========================================" >&2
 
+# Vérifier que l'extension PostgreSQL PHP est chargée
+echo "🔍 Vérification de l'extension PostgreSQL PHP..." >&2
+php -r "
+if (!extension_loaded('pdo_pgsql')) {
+    echo '❌ Extension pdo_pgsql non chargée!\n';
+    echo 'Extensions PDO disponibles: ';
+    \$extensions = get_loaded_extensions();
+    \$pdo_extensions = array_filter(\$extensions, function(\$ext) { return strpos(\$ext, 'pdo') !== false; });
+    echo implode(', ', \$pdo_extensions) ?: 'Aucune extension PDO trouvée';
+    echo '\n';
+    echo 'Toutes les extensions: ' . implode(', ', \$extensions) . '\n';
+    exit(1);
+} else {
+    echo '✅ Extension pdo_pgsql chargée\n';
+}
+" 2>&1 || {
+    echo "❌ L'extension PostgreSQL PHP n'est pas chargée!" >&2
+    echo "⚠️  Le build Docker a peut-être échoué silencieusement" >&2
+    echo "⚠️  Vérifiez les logs de build dans Railway" >&2
+    # Ne pas faire exit 1 ici, continuer pour voir les autres erreurs
+}
+
 # Attendre que la base de données soit prête
 echo "⏳ Vérification de la connexion à la base de données..." >&2
 max_attempts=30
