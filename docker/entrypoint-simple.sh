@@ -20,7 +20,9 @@ chmod -R 775 /var/www/html/bootstrap/cache
 if [ -z "$APP_KEY" ]; then
     echo "❌ ERREUR: APP_KEY n'est pas défini!" >&2
     echo "⚠️  Génération d'une clé d'application..." >&2
-    php artisan key:generate --force 2>&1 || {
+    # Supprimer les caches avant de générer la clé
+    rm -rf /var/www/html/bootstrap/cache/*.php 2>/dev/null || true
+    php artisan key:generate --force 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || {
         echo "❌ Impossible de générer APP_KEY. Veuillez définir APP_KEY dans Railway." >&2
         exit 1
     }
@@ -72,34 +74,46 @@ fi
 
 # Vider TOUS les caches existants MANUELLEMENT (avant d'utiliser artisan)
 echo "🧹 Nettoyage complet des caches..." >&2
-rm -rf /var/www/html/bootstrap/cache/*.php || true
-rm -rf /var/www/html/storage/framework/cache/data/* || true
-rm -rf /var/www/html/storage/framework/views/*.php || true
-rm -rf /var/www/html/storage/framework/sessions/* || true
+# Supprimer complètement le répertoire bootstrap/cache et le recréer
+rm -rf /var/www/html/bootstrap/cache 2>/dev/null || true
+mkdir -p /var/www/html/bootstrap/cache
+chmod -R 775 /var/www/html/bootstrap/cache
+chown -R www-data:www-data /var/www/html/bootstrap/cache
+
+# Supprimer tous les autres caches
+rm -rf /var/www/html/storage/framework/cache/data/* 2>/dev/null || true
+rm -rf /var/www/html/storage/framework/views/*.php 2>/dev/null || true
+rm -rf /var/www/html/storage/framework/sessions/* 2>/dev/null || true
+rm -rf /var/www/html/storage/framework/cache/*.php 2>/dev/null || true
+
+# Régénérer l'autoloader pour s'assurer qu'il est à jour
+echo "🔄 Régénération de l'autoloader..." >&2
+composer dump-autoload --no-interaction --optimize --classmap-authoritative 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
 
 # Maintenant on peut utiliser artisan (les caches sont supprimés)
 echo "🧹 Nettoyage des caches Laravel..." >&2
-php artisan config:clear 2>&1 | grep -v "Class.*env.*does not exist" || true
-php artisan route:clear 2>&1 | grep -v "Class.*env.*does not exist" || true
-php artisan view:clear 2>&1 | grep -v "Class.*env.*does not exist" || true
-php artisan cache:clear 2>&1 | grep -v "Class.*env.*does not exist" || true
+# Utiliser php directement avec les variables d'environnement pour éviter les problèmes de cache
+php artisan config:clear --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
+php artisan route:clear --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
+php artisan view:clear --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
+php artisan cache:clear --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
 
 # Découvrir les packages Laravel (sans cache de config)
 echo "📦 Découverte des packages Laravel..." >&2
-php artisan package:discover --ansi 2>&1 | grep -v "Class.*env.*does not exist" || true
+php artisan package:discover --ansi --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
 
 # Exécuter les migrations
 echo "📦 Exécution des migrations..." >&2
-php artisan migrate --force 2>&1 | grep -v "Class.*env.*does not exist" || echo "⚠️  Erreur lors des migrations, mais on continue..." >&2
+php artisan migrate --force --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || echo "⚠️  Erreur lors des migrations, mais on continue..." >&2
 
 # Créer le lien symbolique pour le storage
 echo "🔗 Création du lien symbolique storage..." >&2
-php artisan storage:link 2>&1 | grep -v "Class.*env.*does not exist" || echo "⚠️  Le lien storage existe déjà ou erreur" >&2
+php artisan storage:link --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || echo "⚠️  Le lien storage existe déjà ou erreur" >&2
 
 # Optimiser Laravel pour la production (sans config:cache pour éviter l'erreur env)
 echo "⚡ Optimisation de Laravel..." >&2
-php artisan route:cache 2>&1 | grep -v "Class.*env.*does not exist" || true
-php artisan view:cache 2>&1 | grep -v "Class.*env.*does not exist" || true
+php artisan route:cache --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
+php artisan view:cache --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
 # Ne pas mettre en cache la config pour éviter l'erreur "Class env does not exist"
 # php artisan config:cache || true
 
