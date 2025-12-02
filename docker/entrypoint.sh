@@ -18,13 +18,34 @@ chown -R www-data:www-data /var/www/html/bootstrap/cache
 chmod -R 775 /var/www/html/storage
 chmod -R 775 /var/www/html/bootstrap/cache
 
+# Afficher les variables d'environnement de base de données (pour debug)
+echo "🔍 Variables d'environnement de base de données:"
+echo "DB_CONNECTION: ${DB_CONNECTION:-non définie}"
+echo "DB_HOST: ${DB_HOST:-non définie}"
+echo "DB_PORT: ${DB_PORT:-non définie}"
+echo "DB_DATABASE: ${DB_DATABASE:-non définie}"
+echo "DB_USERNAME: ${DB_USERNAME:-non définie}"
+echo "DB_PASSWORD: ${DB_PASSWORD:+définie}"
+
 # Attendre que la base de données soit prête (avec timeout)
 echo "⏳ Vérification de la connexion à la base de données..."
 max_attempts=30
 attempt=0
 
 while [ $attempt -lt $max_attempts ]; do
-    if php artisan db:show > /dev/null 2>&1; then
+    # Tester la connexion avec une commande PHP simple
+    if php -r "
+    try {
+        \$pdo = new PDO(
+            'pgsql:host=' . getenv('DB_HOST') . ';port=' . getenv('DB_PORT') . ';dbname=' . getenv('DB_DATABASE'),
+            getenv('DB_USERNAME'),
+            getenv('DB_PASSWORD')
+        );
+        echo 'OK';
+    } catch (Exception \$e) {
+        exit(1);
+    }
+    " > /dev/null 2>&1; then
         echo "✅ Base de données connectée!"
         break
     fi
@@ -35,6 +56,7 @@ done
 
 if [ $attempt -eq $max_attempts ]; then
     echo "⚠️  Impossible de se connecter à la base de données, mais on continue..."
+    echo "⚠️  Vérifiez que les variables DB_* sont correctement configurées dans Railway"
 fi
 
 # Exécuter les migrations
