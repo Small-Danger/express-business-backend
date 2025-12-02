@@ -21,10 +21,10 @@ return [
 
     'allowed_origins' => array_filter([
         // En développement, autoriser localhost
-        app()->environment('local') ? 'http://localhost:3000' : null,
-        app()->environment('local') ? 'http://127.0.0.1:3000' : null,
-        app()->environment('local') ? 'http://localhost:5173' : null,
-        app()->environment('local') ? 'http://127.0.0.1:5173' : null,
+        env('APP_ENV') === 'local' ? 'http://localhost:3000' : null,
+        env('APP_ENV') === 'local' ? 'http://127.0.0.1:3000' : null,
+        env('APP_ENV') === 'local' ? 'http://localhost:5173' : null,
+        env('APP_ENV') === 'local' ? 'http://127.0.0.1:5173' : null,
         // URL de production depuis l'environnement
         env('FRONTEND_URL'),
     ]),
