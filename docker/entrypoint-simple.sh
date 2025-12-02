@@ -151,8 +151,10 @@ php artisan storage:link --no-interaction 2>&1 || echo "⚠️  Le lien storage 
 
 # Optimiser Laravel pour la production (sans config:cache pour éviter l'erreur env)
 echo "=== OPTIMIZE ===" >&2
+# Ne pas mettre en cache les routes si ça échoue (conflits de noms)
 php artisan route:cache --no-interaction 2>&1 || {
-    echo "⚠️  Erreur lors de route:cache" >&2
+    echo "⚠️  Erreur lors de route:cache - Les routes ne seront pas mises en cache" >&2
+    echo "ℹ️  L'application fonctionnera sans cache de routes (légèrement plus lent mais fonctionnel)" >&2
     tail -n 30 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
 }
 php artisan view:cache --no-interaction 2>&1 || {

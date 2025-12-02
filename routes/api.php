@@ -104,8 +104,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Frais des convois Business (Boss et Admin uniquement)
         Route::middleware('role:boss,admin')->group(function () {
-            Route::apiResource('convoy-costs', BusinessConvoyCostController::class);
-            Route::apiResource('wave-costs', BusinessWaveCostController::class);
+            Route::apiResource('convoy-costs', BusinessConvoyCostController::class)->names([
+                'index' => 'business.convoy-costs.index',
+                'show' => 'business.convoy-costs.show',
+                'store' => 'business.convoy-costs.store',
+                'update' => 'business.convoy-costs.update',
+                'destroy' => 'business.convoy-costs.destroy',
+            ]);
+            Route::apiResource('wave-costs', BusinessWaveCostController::class)->names([
+                'index' => 'business.wave-costs.index',
+                'show' => 'business.wave-costs.show',
+                'store' => 'business.wave-costs.store',
+                'update' => 'business.wave-costs.update',
+                'destroy' => 'business.wave-costs.destroy',
+            ]);
         });
 
         // Analytics (Boss et Admin uniquement - pour voir les marges/bénéfices)
@@ -141,8 +153,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Frais Express (Boss et Admin uniquement)
         Route::middleware('role:boss,admin')->group(function () {
-            Route::apiResource('trip-costs', ExpressTripCostController::class);
-            Route::apiResource('wave-costs', ExpressWaveCostController::class);
+            Route::apiResource('trip-costs', ExpressTripCostController::class)->names([
+                'index' => 'express.trip-costs.index',
+                'show' => 'express.trip-costs.show',
+                'store' => 'express.trip-costs.store',
+                'update' => 'express.trip-costs.update',
+                'destroy' => 'express.trip-costs.destroy',
+            ]);
+            Route::apiResource('wave-costs', ExpressWaveCostController::class)->names([
+                'index' => 'express.wave-costs.index',
+                'show' => 'express.wave-costs.show',
+                'store' => 'express.wave-costs.store',
+                'update' => 'express.wave-costs.update',
+                'destroy' => 'express.wave-costs.destroy',
+            ]);
         });
 
         // Tâches automatisées
