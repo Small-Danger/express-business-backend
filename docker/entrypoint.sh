@@ -57,6 +57,14 @@ php artisan view:cache || true
 
 echo "✅ Application prête! Démarrage des services..."
 
+# Remplacer PORT dans la configuration Nginx (Railway utilise un port dynamique)
+if [ -n "$PORT" ]; then
+    sed -i "s/listen \${PORT:-80};/listen $PORT;/g" /etc/nginx/conf.d/default.conf
+    echo "🌐 Nginx configuré pour écouter sur le port $PORT"
+else
+    echo "⚠️  Variable PORT non définie, utilisation du port 80 par défaut"
+fi
+
 # Démarrer Supervisor
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 
