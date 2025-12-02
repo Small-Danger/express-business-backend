@@ -1,5 +1,6 @@
 #!/bin/sh
-set -e
+# Ne pas arrêter le script en cas d'erreur pour permettre le diagnostic
+set +e
 
 echo "🚀 Démarrage de l'application Laravel..."
 
@@ -19,13 +20,15 @@ chmod -R 775 /var/www/html/storage
 chmod -R 775 /var/www/html/bootstrap/cache
 
 # Afficher les variables d'environnement de base de données (pour debug)
+echo "=========================================="
 echo "🔍 Variables d'environnement de base de données:"
 echo "DB_CONNECTION: ${DB_CONNECTION:-non définie}"
 echo "DB_HOST: ${DB_HOST:-non définie}"
 echo "DB_PORT: ${DB_PORT:-non définie}"
 echo "DB_DATABASE: ${DB_DATABASE:-non définie}"
 echo "DB_USERNAME: ${DB_USERNAME:-non définie}"
-echo "DB_PASSWORD: ${DB_PASSWORD:+définie}"
+echo "DB_PASSWORD: ${DB_PASSWORD:+définie (masquée)}"
+echo "=========================================="
 
 # Attendre que la base de données soit prête (avec timeout)
 echo "⏳ Vérification de la connexion à la base de données..."
