@@ -61,7 +61,10 @@ RUN npm run build
 # Créer le répertoire docker s'il n'existe pas
 RUN mkdir -p /etc/nginx/conf.d /etc/supervisor/conf.d /var/log/supervisor /var/log/nginx
 
-# Copier la configuration Nginx
+# Copier la configuration Nginx principale
+COPY docker/nginx-main.conf /etc/nginx/nginx.conf
+
+# Copier la configuration Nginx du serveur
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copier la configuration Supervisor
