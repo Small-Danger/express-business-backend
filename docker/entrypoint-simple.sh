@@ -57,33 +57,35 @@ if [ $attempt -eq $max_attempts ]; then
     echo "⚠️  Impossible de se connecter à la base de données, mais on continue..."
 fi
 
-# Vider TOUS les caches existants (y compris les fichiers de cache)
+# Vider TOUS les caches existants MANUELLEMENT (avant d'utiliser artisan)
 echo "🧹 Nettoyage complet des caches..."
 rm -rf /var/www/html/bootstrap/cache/*.php || true
-rm -rf /var/www/html/storage/framework/cache/* || true
-rm -rf /var/www/html/storage/framework/views/* || true
-php artisan config:clear || true
-php artisan route:clear || true
-php artisan view:clear || true
-php artisan cache:clear || true
-php artisan optimize:clear || true
+rm -rf /var/www/html/storage/framework/cache/data/* || true
+rm -rf /var/www/html/storage/framework/views/*.php || true
+rm -rf /var/www/html/storage/framework/sessions/* || true
 
-# Découvrir les packages Laravel
+# Maintenant on peut utiliser artisan (les caches sont supprimés)
+php artisan config:clear 2>&1 | grep -v "Class.*env.*does not exist" || true
+php artisan route:clear 2>&1 | grep -v "Class.*env.*does not exist" || true
+php artisan view:clear 2>&1 | grep -v "Class.*env.*does not exist" || true
+php artisan cache:clear 2>&1 | grep -v "Class.*env.*does not exist" || true
+
+# Découvrir les packages Laravel (sans cache de config)
 echo "📦 Découverte des packages Laravel..."
-php artisan package:discover --ansi || true
+php artisan package:discover --ansi 2>&1 | grep -v "Class.*env.*does not exist" || true
 
 # Exécuter les migrations
 echo "📦 Exécution des migrations..."
-php artisan migrate --force || echo "⚠️  Erreur lors des migrations, mais on continue..."
+php artisan migrate --force 2>&1 | grep -v "Class.*env.*does not exist" || echo "⚠️  Erreur lors des migrations, mais on continue..."
 
 # Créer le lien symbolique pour le storage
 echo "🔗 Création du lien symbolique storage..."
-php artisan storage:link || echo "⚠️  Le lien storage existe déjà ou erreur"
+php artisan storage:link 2>&1 | grep -v "Class.*env.*does not exist" || echo "⚠️  Le lien storage existe déjà ou erreur"
 
 # Optimiser Laravel pour la production (sans config:cache pour éviter l'erreur env)
 echo "⚡ Optimisation de Laravel..."
-php artisan route:cache || true
-php artisan view:cache || true
+php artisan route:cache 2>&1 | grep -v "Class.*env.*does not exist" || true
+php artisan view:cache 2>&1 | grep -v "Class.*env.*does not exist" || true
 # Ne pas mettre en cache la config pour éviter l'erreur "Class env does not exist"
 # php artisan config:cache || true
 
