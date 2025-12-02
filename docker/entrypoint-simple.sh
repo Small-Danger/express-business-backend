@@ -91,32 +91,87 @@ rm -rf /var/www/html/storage/framework/cache/*.php 2>/dev/null || true
 echo "🔄 Régénération de l'autoloader..." >&2
 COMPOSER_DISABLE_XDEBUG_WARN=1 composer dump-autoload --no-interaction --optimize --classmap-authoritative --no-scripts 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
 
+# Activer temporairement le debug pour capturer les vraies erreurs
+echo "🔍 Activation du mode debug pour diagnostic..." >&2
+export APP_DEBUG=true
+export LOG_LEVEL=debug
+
 # Maintenant on peut utiliser artisan (les caches sont supprimés)
 echo "🧹 Nettoyage des caches Laravel..." >&2
-# Utiliser php directement avec les variables d'environnement pour éviter les problèmes de cache
-php artisan config:clear --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
-php artisan route:clear --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
-php artisan view:clear --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
-php artisan cache:clear --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
+# Capturer les vraies erreurs au lieu de les filtrer
+echo "=== CONFIG:CLEAR ===" >&2
+php artisan config:clear --no-interaction 2>&1 || {
+    echo "❌ ERREUR lors de config:clear - Voir les détails ci-dessus" >&2
+    echo "📋 Affichage des logs Laravel:" >&2
+    tail -n 50 /var/www/html/storage/logs/laravel.log 2>/dev/null || echo "Pas de logs disponibles" >&2
+}
+
+echo "=== ROUTE:CLEAR ===" >&2
+php artisan route:clear --no-interaction 2>&1 || {
+    echo "❌ ERREUR lors de route:clear" >&2
+    tail -n 30 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
+}
+
+echo "=== VIEW:CLEAR ===" >&2
+php artisan view:clear --no-interaction 2>&1 || {
+    echo "❌ ERREUR lors de view:clear" >&2
+    tail -n 30 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
+}
+
+echo "=== CACHE:CLEAR ===" >&2
+php artisan cache:clear --no-interaction 2>&1 || {
+    echo "❌ ERREUR lors de cache:clear" >&2
+    tail -n 30 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
+}
 
 # Découvrir les packages Laravel (sans cache de config)
-echo "📦 Découverte des packages Laravel..." >&2
-php artisan package:discover --ansi --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
+echo "=== PACKAGE:DISCOVER ===" >&2
+php artisan package:discover --ansi --no-interaction 2>&1 || {
+    echo "❌ ERREUR lors de package:discover - C'est probablement la source du problème!" >&2
+    echo "📋 Dernières lignes des logs:" >&2
+    tail -n 50 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
+}
 
 # Exécuter les migrations
-echo "📦 Exécution des migrations..." >&2
-php artisan migrate --force --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || echo "⚠️  Erreur lors des migrations, mais on continue..." >&2
+echo "=== MIGRATE ===" >&2
+php artisan migrate --force --no-interaction 2>&1 || {
+    echo "⚠️  Erreur lors des migrations, mais on continue..." >&2
+    tail -n 30 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
+}
 
 # Créer le lien symbolique pour le storage
-echo "🔗 Création du lien symbolique storage..." >&2
-php artisan storage:link --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || echo "⚠️  Le lien storage existe déjà ou erreur" >&2
+echo "=== STORAGE:LINK ===" >&2
+php artisan storage:link --no-interaction 2>&1 || echo "⚠️  Le lien storage existe déjà ou erreur" >&2
 
 # Optimiser Laravel pour la production (sans config:cache pour éviter l'erreur env)
-echo "⚡ Optimisation de Laravel..." >&2
-php artisan route:cache --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
-php artisan view:cache --no-interaction 2>&1 | grep -vE "(Class.*env.*does not exist|Target class)" || true
+echo "=== OPTIMIZE ===" >&2
+php artisan route:cache --no-interaction 2>&1 || {
+    echo "⚠️  Erreur lors de route:cache" >&2
+    tail -n 30 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
+}
+php artisan view:cache --no-interaction 2>&1 || {
+    echo "⚠️  Erreur lors de view:cache" >&2
+    tail -n 30 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
+}
 # Ne pas mettre en cache la config pour éviter l'erreur "Class env does not exist"
 # php artisan config:cache || true
+
+# Exécuter le script de diagnostic pour identifier les problèmes
+echo "==========================================" >&2
+echo "🔍 EXÉCUTION DU DIAGNOSTIC..." >&2
+echo "==========================================" >&2
+php /var/www/html/docker/diagnose.php 2>&1 || echo "⚠️  Le diagnostic a échoué, mais on continue..." >&2
+
+# Afficher les dernières erreurs des logs avant de démarrer
+echo "==========================================" >&2
+echo "📋 DERNIÈRES ERREURS DANS LES LOGS:" >&2
+echo "==========================================" >&2
+if [ -f /var/www/html/storage/logs/laravel.log ]; then
+    tail -n 100 /var/www/html/storage/logs/laravel.log | grep -i "error\|exception\|fatal\|class.*not found\|target class" | tail -n 30 || echo "Aucune erreur récente dans les logs" >&2
+else
+    echo "Le fichier de log n'existe pas encore" >&2
+fi
+echo "==========================================" >&2
 
 # Vérifier que le port est défini
 if [ -z "$PORT" ]; then

@@ -31,13 +31,37 @@ $uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
 try {
     require_once '/var/www/html/public/index.php';
 } catch (Throwable $e) {
-    // Logger l'erreur mais ne pas faire crash le serveur
-    error_log("Router error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+    // Logger l'erreur complète dans les logs Laravel
+    $logFile = '/var/www/html/storage/logs/laravel.log';
+    $errorMessage = sprintf(
+        "[%s] Router error: %s\nFile: %s:%d\nStack trace:\n%s\n",
+        date('Y-m-d H:i:s'),
+        $e->getMessage(),
+        $e->getFile(),
+        $e->getLine(),
+        $e->getTraceAsString()
+    );
+    file_put_contents($logFile, $errorMessage, FILE_APPEND);
+    
+    // Afficher l'erreur complète dans la réponse si en mode debug
     http_response_code(500);
     header('Content-Type: application/json');
-    echo json_encode([
+    
+    $response = [
         'error' => 'Internal Server Error',
         'message' => 'An error occurred while processing your request.'
-    ], JSON_PRETTY_PRINT);
+    ];
+    
+    // En mode debug, inclure les détails de l'erreur
+    if (getenv('APP_DEBUG') === 'true') {
+        $response['debug'] = [
+            'message' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => explode("\n", $e->getTraceAsString())
+        ];
+    }
+    
+    echo json_encode($response, JSON_PRETTY_PRINT);
 }
 
