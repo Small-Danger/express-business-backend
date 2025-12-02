@@ -2,7 +2,7 @@
 # Ne pas arrêter le script en cas d'erreur pour permettre le diagnostic
 set +e
 
-echo "🚀 Démarrage de l'application Laravel..."
+echo "🚀 Démarrage de l'application Laravel..." >&2
 
 # Créer les répertoires nécessaires
 mkdir -p /var/www/html/storage/logs
@@ -20,18 +20,19 @@ chmod -R 775 /var/www/html/storage
 chmod -R 775 /var/www/html/bootstrap/cache
 
 # Afficher les variables d'environnement de base de données (pour debug)
-echo "=========================================="
-echo "🔍 Variables d'environnement de base de données:"
-echo "DB_CONNECTION: ${DB_CONNECTION:-non définie}"
-echo "DB_HOST: ${DB_HOST:-non définie}"
-echo "DB_PORT: ${DB_PORT:-non définie}"
-echo "DB_DATABASE: ${DB_DATABASE:-non définie}"
-echo "DB_USERNAME: ${DB_USERNAME:-non définie}"
-echo "DB_PASSWORD: ${DB_PASSWORD:+définie (masquée)}"
-echo "=========================================="
+# Forcer l'affichage sur stdout et stderr
+echo "==========================================" >&2
+echo "🔍 Variables d'environnement de base de données:" >&2
+echo "DB_CONNECTION: ${DB_CONNECTION:-non définie}" >&2
+echo "DB_HOST: ${DB_HOST:-non définie}" >&2
+echo "DB_PORT: ${DB_PORT:-non définie}" >&2
+echo "DB_DATABASE: ${DB_DATABASE:-non définie}" >&2
+echo "DB_USERNAME: ${DB_USERNAME:-non définie}" >&2
+echo "DB_PASSWORD: ${DB_PASSWORD:+définie (masquée)}" >&2
+echo "==========================================" >&2
 
 # Attendre que la base de données soit prête (avec timeout)
-echo "⏳ Vérification de la connexion à la base de données..."
+echo "⏳ Vérification de la connexion à la base de données..." >&2
 max_attempts=30
 attempt=0
 
@@ -49,56 +50,56 @@ while [ $attempt -lt $max_attempts ]; do
         exit(1);
     }
     " > /dev/null 2>&1; then
-        echo "✅ Base de données connectée!"
+        echo "✅ Base de données connectée!" >&2
         break
     fi
     attempt=$((attempt + 1))
-    echo "Tentative $attempt/$max_attempts..."
+    echo "Tentative $attempt/$max_attempts..." >&2
     sleep 2
 done
 
 if [ $attempt -eq $max_attempts ]; then
-    echo "⚠️  Impossible de se connecter à la base de données, mais on continue..."
-    echo "⚠️  Vérifiez que les variables DB_* sont correctement configurées dans Railway"
+    echo "⚠️  Impossible de se connecter à la base de données, mais on continue..." >&2
+    echo "⚠️  Vérifiez que les variables DB_* sont correctement configurées dans Railway" >&2
 fi
 
 # Exécuter les migrations
-echo "📦 Exécution des migrations..."
-php artisan migrate --force || echo "⚠️  Erreur lors des migrations, mais on continue..."
+echo "📦 Exécution des migrations..." >&2
+php artisan migrate --force 2>&1 || echo "⚠️  Erreur lors des migrations, mais on continue..." >&2
 
 # Créer le lien symbolique pour le storage
-echo "🔗 Création du lien symbolique storage..."
-php artisan storage:link || echo "⚠️  Le lien storage existe déjà ou erreur"
+echo "🔗 Création du lien symbolique storage..." >&2
+php artisan storage:link 2>&1 || echo "⚠️  Le lien storage existe déjà ou erreur" >&2
 
 # Découvrir les packages Laravel (nécessaire après composer install --no-scripts)
-echo "📦 Découverte des packages Laravel..."
-php artisan package:discover --ansi || true
+echo "📦 Découverte des packages Laravel..." >&2
+php artisan package:discover --ansi 2>&1 || true
 
 # Optimiser Laravel pour la production
-echo "⚡ Optimisation de Laravel..."
-php artisan config:cache || true
-php artisan route:cache || true
-php artisan view:cache || true
+echo "⚡ Optimisation de Laravel..." >&2
+php artisan config:cache 2>&1 || true
+php artisan route:cache 2>&1 || true
+php artisan view:cache 2>&1 || true
 
-echo "✅ Application prête! Démarrage des services..."
+echo "✅ Application prête! Démarrage des services..." >&2
 
 # Remplacer PORT dans la configuration Nginx (Railway utilise un port dynamique)
 if [ -n "$PORT" ]; then
     sed -i "s/listen \${PORT:-80};/listen $PORT;/g" /etc/nginx/conf.d/default.conf
-    echo "🌐 Nginx configuré pour écouter sur le port $PORT"
+    echo "🌐 Nginx configuré pour écouter sur le port $PORT" >&2
 else
-    echo "⚠️  Variable PORT non définie, utilisation du port 80 par défaut"
+    echo "⚠️  Variable PORT non définie, utilisation du port 80 par défaut" >&2
 fi
 
 # Vérifier que PHP-FPM peut démarrer
-echo "🔍 Vérification de PHP-FPM..."
-php-fpm -t || echo "⚠️  Erreur de configuration PHP-FPM"
+echo "🔍 Vérification de PHP-FPM..." >&2
+php-fpm -t 2>&1 || echo "⚠️  Erreur de configuration PHP-FPM" >&2
 
 # Vérifier que Nginx peut démarrer
-echo "🔍 Vérification de Nginx..."
-nginx -t || echo "⚠️  Erreur de configuration Nginx"
+echo "🔍 Vérification de Nginx..." >&2
+nginx -t 2>&1 || echo "⚠️  Erreur de configuration Nginx" >&2
 
 # Démarrer Supervisor
-echo "🚀 Démarrage de Supervisor..."
+echo "🚀 Démarrage de Supervisor..." >&2
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 
