@@ -80,7 +80,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('products', ProductController::class);
 
         // Vagues Business (tous les utilisateurs authentifiés)
-        Route::apiResource('waves', BusinessWaveController::class);
+        Route::apiResource('waves', BusinessWaveController::class)->names([
+            'index' => 'business.waves.index',
+            'show' => 'business.waves.show',
+            'store' => 'business.waves.store',
+            'update' => 'business.waves.update',
+            'destroy' => 'business.waves.destroy',
+        ]);
 
         // Convois Business (tous les utilisateurs authentifiés)
         Route::apiResource('convoys', BusinessConvoyController::class);
@@ -113,7 +119,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Module Express
     Route::prefix('express')->group(function () {
         // Vagues Express (tous les utilisateurs authentifiés)
-        Route::apiResource('waves', ExpressWaveController::class);
+        Route::apiResource('waves', ExpressWaveController::class)->names([
+            'index' => 'express.waves.index',
+            'show' => 'express.waves.show',
+            'store' => 'express.waves.store',
+            'update' => 'express.waves.update',
+            'destroy' => 'express.waves.destroy',
+        ]);
 
         // Trajets Express (tous les utilisateurs authentifiés)
         Route::apiResource('trips', ExpressTripController::class);

@@ -139,6 +139,12 @@ php artisan migrate --force --no-interaction 2>&1 || {
     tail -n 30 /var/www/html/storage/logs/laravel.log 2>/dev/null || true
 }
 
+# Vérifier si la table cache existe, sinon exécuter la migration spécifique
+echo "=== VÉRIFICATION TABLE CACHE ===" >&2
+php artisan migrate --path=database/migrations/0001_01_01_000001_create_cache_table.php --force --no-interaction 2>&1 || {
+    echo "⚠️  La migration de la table cache a peut-être déjà été exécutée ou a échoué" >&2
+}
+
 # Créer le lien symbolique pour le storage
 echo "=== STORAGE:LINK ===" >&2
 php artisan storage:link --no-interaction 2>&1 || echo "⚠️  Le lien storage existe déjà ou erreur" >&2
