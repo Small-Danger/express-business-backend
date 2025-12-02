@@ -31,10 +31,17 @@ class AuthController extends Controller
         try {
             $user = User::where('email', $request->email)->first();
 
-            if (!$user || !Hash::check($request->password, $user->password)) {
+            if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Identifiants incorrects',
+                    'message' => 'Aucun compte trouvé avec cet email. Vérifiez votre adresse email.',
+                ], 401);
+            }
+
+            if (!Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Mot de passe incorrect. Vérifiez votre mot de passe.',
                 ], 401);
             }
 
@@ -50,10 +57,16 @@ class AuthController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            \Log::error('Erreur de connexion', [
+                'email' => $request->email,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la connexion',
-                'error' => $e->getMessage(),
+                'message' => 'Une erreur est survenue lors de la connexion. Veuillez réessayer.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
