@@ -100,5 +100,53 @@ class ExpressParcel extends Model
     {
         return $this->hasMany(ExpressParcelStatusHistory::class);
     }
+
+    /**
+     * Accesseur : Déterminer la devise principale du colis
+     * La devise principale est celle avec un montant > 0
+     */
+    public function getCurrencyAttribute(): string
+    {
+        // Si price_mad > 0, la devise principale est MAD
+        if ($this->price_mad > 0) {
+            return 'MAD';
+        }
+        // Sinon, la devise principale est CFA
+        return 'CFA';
+    }
+
+    /**
+     * Accesseur : Obtenir le montant principal dans la devise d'origine
+     */
+    public function getPriceAttribute(): float
+    {
+        return $this->currency === 'MAD' ? (float) $this->price_mad : (float) $this->price_cfa;
+    }
+
+    /**
+     * Accesseur : Obtenir le prix équivalent en MAD (calculé si nécessaire)
+     */
+    public function getPriceInMadAttribute(): float
+    {
+        if ($this->currency === 'MAD') {
+            return (float) $this->price_mad;
+        }
+        // Convertir CFA en MAD avec le taux actuel (on devrait utiliser le taux stocké mais pour compatibilité on utilise le service)
+        $currencyConverter = app(\App\Services\CurrencyConverterService::class);
+        return $currencyConverter->convertCfaToMad((float) $this->price_cfa);
+    }
+
+    /**
+     * Accesseur : Obtenir le prix équivalent en CFA (calculé si nécessaire)
+     */
+    public function getPriceInCfaAttribute(): float
+    {
+        if ($this->currency === 'CFA') {
+            return (float) $this->price_cfa;
+        }
+        // Convertir MAD en CFA avec le taux actuel
+        $currencyConverter = app(\App\Services\CurrencyConverterService::class);
+        return $currencyConverter->convertMadToCfa((float) $this->price_mad);
+    }
 }
 

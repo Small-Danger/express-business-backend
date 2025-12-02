@@ -136,12 +136,33 @@ class DashboardController extends Controller
         $parcels = ExpressParcel::whereBetween('created_at', [$startDate, $endDate])->get();
 
         $totalParcels = $parcels->count();
-        $totalRevenue = $parcels->sum('price_mad');
+        
+        // Calculer le CA en tenant compte de la devise principale de chaque colis
+        // Convertir tous les prix en MAD pour cohérence (utiliser l'accesseur du modèle)
+        $totalRevenue = 0;
+        foreach ($parcels as $parcel) {
+            $totalRevenue += $parcel->price_in_mad; // Utilise l'accesseur qui calcule le prix en MAD
+        }
+        
         $inTransit = $parcels->where('status', 'in_transit')->count();
         $delivered = $parcels->where('status', 'delivered')->count();
         $readyForPickup = $parcels->where('status', 'ready_for_pickup')->count();
         $totalWeight = $parcels->sum('weight_kg');
-        $totalPaid = $parcels->sum('total_paid');
+        
+        // Calculer le total payé en tenant compte de la devise principale
+        $totalPaid = 0;
+        foreach ($parcels as $parcel) {
+            // Le total_paid est dans la devise principale du colis, convertir en MAD
+            if ($parcel->total_paid > 0) {
+                if ($parcel->currency === 'MAD') {
+                    $totalPaid += $parcel->total_paid;
+                } else {
+                    $currencyConverter = app(\App\Services\CurrencyConverterService::class);
+                    $totalPaid += $currencyConverter->convertCfaToMad($parcel->total_paid);
+                }
+            }
+        }
+        
         $totalDebt = $totalRevenue - $totalPaid;
 
         // Top destinations
@@ -237,9 +258,13 @@ class DashboardController extends Controller
                 ->sum('total_amount');
             $businessData[] = (float) $businessRevenue;
 
-            // CA Express pour ce mois
-            $expressRevenue = ExpressParcel::whereBetween('created_at', [$startDate, $endDate])
-                ->sum('price_mad');
+            // CA Express pour ce mois - convertir tous les prix en MAD pour cohérence
+            $expressParcels = ExpressParcel::whereBetween('created_at', [$startDate, $endDate])->get();
+            $expressRevenue = 0;
+            foreach ($expressParcels as $parcel) {
+                // Utiliser l'accesseur du modèle pour obtenir le prix en MAD
+                $expressRevenue += $parcel->price_in_mad;
+            }
             $expressData[] = (float) $expressRevenue;
         }
 

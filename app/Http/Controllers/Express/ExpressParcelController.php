@@ -146,14 +146,38 @@ class ExpressParcelController extends Controller
                 $reference = $request->reference;
             }
 
-            // Calculer le prix total selon la devise d'enregistrement
-            // Si price_mad > 0, utiliser price_mad comme base, sinon utiliser price_cfa
-            $totalAmount = 0;
-            if ($request->price_mad > 0) {
-                $totalAmount = $request->price_mad;
+            // Déterminer la devise principale et le montant principal
+            // Règle : Si price_mad > 0, MAD est la devise principale, sinon CFA
+            $priceMad = (float) ($request->price_mad ?? 0);
+            $priceCfa = (float) ($request->price_cfa ?? 0);
+            
+            // Déterminer la devise principale
+            $primaryCurrency = ($priceMad > 0) ? 'MAD' : 'CFA';
+            $primaryAmount = ($primaryCurrency === 'MAD') ? $priceMad : $priceCfa;
+            
+            // Calculer l'équivalent dans l'autre devise avec le taux actuel pour stockage
+            // (ceci est utilisé uniquement pour l'affichage, la devise principale est la source de vérité)
+            $exchangeRate = $this->currencyConverter->getExchangeRate();
+            if ($primaryCurrency === 'MAD') {
+                // Si MAD est principal, calculer l'équivalent CFA
+                $calculatedCfa = $this->currencyConverter->convertMadToCfa($primaryAmount);
+                // Utiliser le prix CFA fourni s'il est proche du calculé (tolérance de 1%), sinon utiliser le calculé
+                if ($priceCfa > 0 && abs($priceCfa - $calculatedCfa) / max($calculatedCfa, 1) < 0.01) {
+                    $finalPriceCfa = $priceCfa;
+                } else {
+                    $finalPriceCfa = $calculatedCfa;
+                }
+                $finalPriceMad = $primaryAmount;
             } else {
-                // Convertir CFA en MAD pour la comparaison
-                $totalAmount = $request->price_cfa / 63.0; // 63 = taux de change par défaut
+                // Si CFA est principal, calculer l'équivalent MAD
+                $calculatedMad = $this->currencyConverter->convertCfaToMad($primaryAmount);
+                // Utiliser le prix MAD fourni s'il est proche du calculé, sinon utiliser le calculé
+                if ($priceMad > 0 && abs($priceMad - $calculatedMad) / max($calculatedMad, 1) < 0.01) {
+                    $finalPriceMad = $priceMad;
+                } else {
+                    $finalPriceMad = $calculatedMad;
+                }
+                $finalPriceCfa = $primaryAmount;
             }
             
             // Récupérer les paiements fractionnés si fournis
@@ -165,9 +189,11 @@ class ExpressParcelController extends Controller
                 // Rétrocompatibilité : utiliser total_paid si pas de paiements fractionnés
                 $initialTotalPaid = $request->get('total_paid', 0);
             }
-            $hasDebt = $initialTotalPaid < $totalAmount;
+            
+            // Comparer le total payé avec le montant principal dans la même devise
+            $hasDebt = $initialTotalPaid < $primaryAmount;
 
-            // Créer le colis
+            // Créer le colis avec les prix calculés de manière cohérente
             $parcel = ExpressParcel::create([
                 'client_id' => $request->client_id,
                 'receiver_client_id' => $request->receiver_client_id,
@@ -175,12 +201,12 @@ class ExpressParcelController extends Controller
                 'reference' => $reference,
                 'description' => $request->description,
                 'weight_kg' => $request->weight_kg,
-                'price_mad' => $request->price_mad,
-                'price_cfa' => $request->price_cfa,
+                'price_mad' => $finalPriceMad,
+                'price_cfa' => $finalPriceCfa,
                 'total_paid' => $initialTotalPaid,
                 'has_debt' => $hasDebt,
                 'status' => $request->get('status', 'registered'),
-                'created_by_user_id' => auth()->id() ?? 1, // TODO: utiliser auth()->id()
+                'created_by_user_id' => auth()->id() ?? 1,
             ]);
 
             // Créer l'entrée dans l'historique des statuts
@@ -194,8 +220,8 @@ class ExpressParcelController extends Controller
 
             // Créer les transactions CREDIT pour les paiements fractionnés au dépôt
             if (!empty($payments)) {
-                // Déterminer la devise du montant saisi (basé sur la devise principale du colis)
-                $parcelCurrency = $parcel->price_mad > 0 ? 'MAD' : 'CFA';
+                // Déterminer la devise principale du colis (utiliser l'accesseur du modèle)
+                $parcelCurrency = $parcel->currency; // Utilise l'accesseur qui détermine la devise principale
                 
                 foreach ($payments as $payment) {
                     if (isset($payment['account_id']) && isset($payment['amount']) && $payment['amount'] > 0) {
@@ -322,20 +348,32 @@ class ExpressParcelController extends Controller
 
             // Mettre à jour has_debt si total_paid ou prix sont modifiés
             if ($request->has('total_paid') || $request->has('price_mad') || $request->has('price_cfa')) {
-                $priceMad = $request->has('price_mad') ? $request->price_mad : $parcel->price_mad;
-                $priceCfa = $request->has('price_cfa') ? $request->price_cfa : $parcel->price_cfa;
+                $priceMad = $request->has('price_mad') ? (float) $request->price_mad : (float) $parcel->price_mad;
+                $priceCfa = $request->has('price_cfa') ? (float) $request->price_cfa : (float) $parcel->price_cfa;
                 
-                // Calculer le prix total selon la devise d'enregistrement
-                $totalAmount = 0;
-                if ($priceMad > 0) {
-                    $totalAmount = $priceMad;
-                } else {
-                    // Convertir CFA en MAD pour la comparaison
-                    $totalAmount = $priceCfa / 63.0; // 63 = taux de change par défaut
+                // Déterminer la devise principale (MAD si price_mad > 0, sinon CFA)
+                $primaryCurrency = ($priceMad > 0) ? 'MAD' : 'CFA';
+                $primaryAmount = ($primaryCurrency === 'MAD') ? $priceMad : $priceCfa;
+                
+                // Recalculer l'équivalent dans l'autre devise si nécessaire
+                if ($request->has('price_mad') || $request->has('price_cfa')) {
+                    if ($primaryCurrency === 'MAD') {
+                        $calculatedCfa = $this->currencyConverter->convertMadToCfa($primaryAmount);
+                        if (!isset($updateData['price_cfa']) || abs($priceCfa - $calculatedCfa) / max($calculatedCfa, 1) >= 0.01) {
+                            $updateData['price_cfa'] = $calculatedCfa;
+                        }
+                        $updateData['price_mad'] = $primaryAmount;
+                    } else {
+                        $calculatedMad = $this->currencyConverter->convertCfaToMad($primaryAmount);
+                        if (!isset($updateData['price_mad']) || abs($priceMad - $calculatedMad) / max($calculatedMad, 1) >= 0.01) {
+                            $updateData['price_mad'] = $calculatedMad;
+                        }
+                        $updateData['price_cfa'] = $primaryAmount;
+                    }
                 }
                 
-                $totalPaid = $request->has('total_paid') ? $request->total_paid : $parcel->total_paid;
-                $updateData['has_debt'] = $totalPaid < $totalAmount;
+                $totalPaid = $request->has('total_paid') ? (float) $request->total_paid : (float) $parcel->total_paid;
+                $updateData['has_debt'] = $totalPaid < $primaryAmount;
             }
 
             // Si le statut change, enregistrer dans l'historique
@@ -480,8 +518,8 @@ class ExpressParcelController extends Controller
 
             // Créer les transactions CREDIT pour les paiements fractionnés lors du pickup
             if ($amountPaid > 0) {
-                // Déterminer la devise du montant saisi (basé sur la devise principale du colis)
-                $parcelCurrency = $parcel->price_mad > 0 ? 'MAD' : 'CFA';
+                // Déterminer la devise principale du colis (utiliser l'accesseur du modèle)
+                $parcelCurrency = $parcel->currency; // Utilise l'accesseur qui détermine la devise principale
                 
                 if (!empty($payments)) {
                     // Paiements fractionnés
