@@ -65,6 +65,15 @@ else
     echo "⚠️  Variable PORT non définie, utilisation du port 80 par défaut"
 fi
 
+# Vérifier que PHP-FPM peut démarrer
+echo "🔍 Vérification de PHP-FPM..."
+php-fpm -t || echo "⚠️  Erreur de configuration PHP-FPM"
+
+# Vérifier que Nginx peut démarrer
+echo "🔍 Vérification de Nginx..."
+nginx -t || echo "⚠️  Erreur de configuration Nginx"
+
 # Démarrer Supervisor
+echo "🚀 Démarrage de Supervisor..."
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 

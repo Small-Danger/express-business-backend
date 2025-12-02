@@ -67,6 +67,9 @@ COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 # Copier la configuration Supervisor
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Copier la configuration PHP-FPM
+COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
+
 # Copier le script d'entrypoint
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
