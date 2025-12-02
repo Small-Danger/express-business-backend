@@ -84,11 +84,24 @@ class ProductController extends Controller
                 \DB::transaction(function () use ($request, &$sku) {
                     $currencyPrefix = strtoupper($request->currency);
                     $prefix = 'PROD-' . $currencyPrefix . '-';
+                    
+                    // Détecter le driver de la base de données pour utiliser la bonne syntaxe
+                    $dbDriver = \DB::connection()->getDriverName();
+                    $startPos = strlen($prefix) + 1;
 
-                    $lastProduct = Product::where('sku', 'like', $prefix . '%')
-                        ->lockForUpdate()
-                        ->orderByRaw("CAST(SUBSTRING(sku, " . (strlen($prefix) + 1) . ") AS UNSIGNED) DESC")
-                        ->first();
+                    if ($dbDriver === 'pgsql') {
+                        // PostgreSQL : utiliser SUBSTRING avec FROM et CAST en INTEGER
+                        $lastProduct = Product::where('sku', 'like', $prefix . '%')
+                            ->lockForUpdate()
+                            ->orderByRaw("CAST(SUBSTRING(sku FROM {$startPos}) AS INTEGER) DESC")
+                            ->first();
+                    } else {
+                        // MySQL : utiliser SUBSTRING avec position et CAST en UNSIGNED
+                        $lastProduct = Product::where('sku', 'like', $prefix . '%')
+                            ->lockForUpdate()
+                            ->orderByRaw("CAST(SUBSTRING(sku, {$startPos}) AS UNSIGNED) DESC")
+                            ->first();
+                    }
 
                     $lastNumber = 0;
                     if ($lastProduct && preg_match('/-(\d+)$/', $lastProduct->sku, $matches)) {

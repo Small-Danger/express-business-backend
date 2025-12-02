@@ -119,11 +119,24 @@ class ClientController extends Controller
                         ? 'CLI-BOTH' 
                         : ($request->get('is_business_client', false) ? 'CLI-BUS' : 'CLI-EXP');
                     
+                    // Détecter le driver de la base de données pour utiliser la bonne syntaxe
+                    $dbDriver = \DB::connection()->getDriverName();
+                    $startPos = strlen($prefix) + 2;
+                    
                     // Verrouiller pour lecture et obtenir le dernier numéro
-                    $lastClient = Client::where('code', 'like', $prefix . '-%')
-                        ->lockForUpdate()
-                        ->orderByRaw("CAST(SUBSTRING(code, " . (strlen($prefix) + 2) . ") AS UNSIGNED) DESC")
-                        ->first();
+                    if ($dbDriver === 'pgsql') {
+                        // PostgreSQL : utiliser SUBSTRING avec FROM et CAST en INTEGER
+                        $lastClient = Client::where('code', 'like', $prefix . '-%')
+                            ->lockForUpdate()
+                            ->orderByRaw("CAST(SUBSTRING(code FROM {$startPos}) AS INTEGER) DESC")
+                            ->first();
+                    } else {
+                        // MySQL : utiliser SUBSTRING avec position et CAST en UNSIGNED
+                        $lastClient = Client::where('code', 'like', $prefix . '-%')
+                            ->lockForUpdate()
+                            ->orderByRaw("CAST(SUBSTRING(code, {$startPos}) AS UNSIGNED) DESC")
+                            ->first();
+                    }
                     
                     $lastNumber = 0;
                     if ($lastClient && preg_match('/-(\d+)$/', $lastClient->code, $matches)) {
