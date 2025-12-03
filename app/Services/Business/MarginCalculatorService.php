@@ -55,19 +55,56 @@ class MarginCalculatorService
      */
     public function calculateWaveMarginStats($wave): array
     {
-        $totalRevenue = $wave->orders->sum('total_amount');
-        $totalPurchaseCost = $wave->orders->sum('total_purchase_cost');
-        $totalMargin = $wave->orders->sum('total_margin_amount');
-        $totalCosts = $wave->costs->sum('amount');
-        $netProfit = $totalMargin - $totalCosts;
+        $currencyConverter = app(\App\Services\CurrencyConverterService::class);
+        
+        // Convertir tous les montants en MAD pour cohérence
+        $totalRevenueMAD = 0;
+        $totalPurchaseCostMAD = 0;
+        $totalMarginMAD = 0;
+        
+        foreach ($wave->orders as $order) {
+            if ($order->currency === 'MAD') {
+                $totalRevenueMAD += $order->total_amount;
+                $totalPurchaseCostMAD += $order->total_purchase_cost;
+                $totalMarginMAD += $order->total_margin_amount;
+            } else {
+                // Convertir CFA en MAD
+                $totalRevenueMAD += $currencyConverter->convertCfaToMad($order->total_amount);
+                $totalPurchaseCostMAD += $currencyConverter->convertCfaToMad($order->total_purchase_cost);
+                $totalMarginMAD += $currencyConverter->convertCfaToMad($order->total_margin_amount);
+            }
+        }
+        
+        // Convertir les frais de la vague en MAD
+        $totalCostsMAD = 0;
+        foreach ($wave->costs as $cost) {
+            if ($cost->currency === 'MAD') {
+                $totalCostsMAD += $cost->amount;
+            } else {
+                $totalCostsMAD += $currencyConverter->convertCfaToMad($cost->amount);
+            }
+        }
+        
+        // Convertir les frais des convois en MAD
+        foreach ($wave->convoys as $convoy) {
+            foreach ($convoy->costs as $cost) {
+                if ($cost->currency === 'MAD') {
+                    $totalCostsMAD += $cost->amount;
+                } else {
+                    $totalCostsMAD += $currencyConverter->convertCfaToMad($cost->amount);
+                }
+            }
+        }
+        
+        $netProfit = $totalMarginMAD - $totalCostsMAD;
 
         return [
-            'total_revenue' => round($totalRevenue, 2),
-            'total_purchase_cost' => round($totalPurchaseCost, 2),
-            'total_margin' => round($totalMargin, 2),
-            'total_costs' => round($totalCosts, 2),
+            'total_revenue' => round($totalRevenueMAD, 2),
+            'total_purchase_cost' => round($totalPurchaseCostMAD, 2),
+            'total_margin' => round($totalMarginMAD, 2),
+            'total_costs' => round($totalCostsMAD, 2),
             'net_profit' => round($netProfit, 2),
-            'profit_rate' => $totalRevenue > 0 ? round(($netProfit / $totalRevenue) * 100, 2) : 0,
+            'profit_rate' => $totalRevenueMAD > 0 ? round(($netProfit / $totalRevenueMAD) * 100, 2) : 0,
         ];
     }
 }

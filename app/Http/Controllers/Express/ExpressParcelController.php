@@ -594,6 +594,7 @@ class ExpressParcelController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
+        DB::beginTransaction();
         try {
             $parcel = ExpressParcel::findOrFail($id);
 
@@ -605,13 +606,22 @@ class ExpressParcelController extends Controller
                 ], 422);
             }
 
+            // Supprimer toutes les transactions financières associées à ce colis
+            \App\Models\FinancialTransaction::where('related_type', 'ExpressParcel')
+                ->where('related_id', $parcel->id)
+                ->whereIn('transaction_category', ['parcel_deposit', 'parcel_pickup_payment'])
+                ->delete();
+
             $parcel->delete();
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Colis supprimé avec succès',
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la suppression du colis',

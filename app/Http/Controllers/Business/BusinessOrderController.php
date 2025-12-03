@@ -471,6 +471,7 @@ class BusinessOrderController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
+        DB::beginTransaction();
         try {
             $order = BusinessOrder::findOrFail($id);
 
@@ -482,13 +483,22 @@ class BusinessOrderController extends Controller
                 ], 422);
             }
 
+            // Supprimer toutes les transactions financières associées à cette commande
+            \App\Models\FinancialTransaction::where('related_type', 'BusinessOrder')
+                ->where('related_id', $order->id)
+                ->whereIn('transaction_category', ['order_purchase', 'order_payment', 'order_pickup_payment'])
+                ->delete();
+
             $order->delete();
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Commande supprimée avec succès',
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la suppression de la commande',

@@ -106,6 +106,9 @@ class BusinessWaveController extends Controller
     {
         try {
             $wave = BusinessWave::with([
+                'convoys' => function ($q) {
+                    $q->withCount('orders');
+                },
                 'convoys.costs',
                 'orders.client',
                 'costs'
