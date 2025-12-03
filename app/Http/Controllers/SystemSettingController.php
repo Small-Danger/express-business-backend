@@ -60,10 +60,10 @@ class SystemSettingController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'key' => 'required|string|max:255|unique:system_settings,key',
-            'value' => 'required|string',
+            'value' => 'required',
             'type' => 'required|string|in:decimal,integer,string,boolean',
             'description' => 'nullable|string',
-            'is_active' => 'boolean',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -75,13 +75,18 @@ class SystemSettingController extends Controller
         }
 
         try {
+            // Normaliser is_active : accepter boolean, string "true"/"false", ou 1/0
+            $isActive = $request->has('is_active') 
+                ? filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true
+                : true;
+            
             $setting = SystemSetting::create([
                 'key' => $request->key,
                 'value' => (string) $request->value,
                 'type' => $request->type,
                 'description' => $request->description,
-                'is_active' => $request->get('is_active', true),
-                'updated_by_user_id' => auth()->id() ?? 1, // TODO: utiliser auth()->id()
+                'is_active' => $isActive,
+                'updated_by_user_id' => auth()->id() ?? 1,
             ]);
 
             return response()->json([
@@ -162,10 +167,10 @@ class SystemSettingController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'key' => 'sometimes|required|string|max:255|unique:system_settings,key,' . $id,
-            'value' => 'sometimes|required|string',
+            'value' => 'sometimes|required',
             'type' => 'sometimes|required|string|in:decimal,integer,string,boolean',
             'description' => 'nullable|string',
-            'is_active' => 'boolean',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -179,10 +184,24 @@ class SystemSettingController extends Controller
         try {
             $setting = SystemSetting::findOrFail($id);
 
-            $updateData = $request->only(['key', 'type', 'description', 'is_active']);
+            $updateData = [];
             
+            if ($request->has('key')) {
+                $updateData['key'] = $request->key;
+            }
+            if ($request->has('type')) {
+                $updateData['type'] = $request->type;
+            }
+            if ($request->has('description')) {
+                $updateData['description'] = $request->description;
+            }
             if ($request->has('value')) {
                 $updateData['value'] = (string) $request->value;
+            }
+            if ($request->has('is_active')) {
+                // Normaliser is_active : accepter boolean, string "true"/"false", ou 1/0
+                $isActive = filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                $updateData['is_active'] = $isActive !== null ? $isActive : true;
             }
 
             $updateData['updated_by_user_id'] = auth()->id() ?? 1;
