@@ -16,10 +16,10 @@ class ClientController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            // Base query : clients Business uniquement (compatible avec l'ancien code)
-            $query = Client::where('is_business_client', true);
+            // Base query : afficher TOUS les clients par défaut
+            $query = Client::query();
 
-            // Filtre par type de client
+            // Filtre par type de client (optionnel)
             if ($request->has('client_type')) {
                 $clientType = $request->client_type;
                 if ($clientType === 'business') {
@@ -27,14 +27,17 @@ class ClientController extends Controller
                     $query->where('is_business_client', true)
                         ->where('is_express_client', false);
                 } elseif ($clientType === 'express') {
-                    // Clients Business qui sont aussi Express
-                    $query->where('is_business_client', true)
-                        ->where('is_express_client', true);
+                    // Clients Express uniquement (pas Business)
+                    $query->where('is_express_client', true)
+                        ->where('is_business_client', false);
                 } elseif ($clientType === 'both') {
-                    // Business ET Express (même chose que express dans cette route)
+                    // Business ET Express
                     $query->where('is_business_client', true)
                         ->where('is_express_client', true);
                 }
+            } else {
+                // Par défaut, afficher tous les clients (Business, Express, ou les deux)
+                // Pas de filtre supplémentaire
             }
 
             // Recherche par nom, téléphone, email
@@ -155,6 +158,12 @@ class ClientController extends Controller
                 });
             }
 
+            // Dans le module Business, par défaut is_business_client doit être true
+            // Si la valeur n'est pas fournie explicitement, on la met à true
+            $isBusinessClient = $request->has('is_business_client') 
+                ? $request->get('is_business_client', false) 
+                : true;
+
             $client = Client::create([
                 'code' => $code,
                 'first_name' => $request->first_name,
@@ -165,7 +174,7 @@ class ClientController extends Controller
                 'country' => $request->country,
                 'city' => $request->city,
                 'address' => $request->address,
-                'is_business_client' => $request->get('is_business_client', false),
+                'is_business_client' => $isBusinessClient,
                 'is_express_client' => $request->get('is_express_client', false),
                 'notes' => $request->notes,
             ]);
