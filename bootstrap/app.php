@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Console\Scheduling\Schedule;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -20,6 +21,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        // Envoyer les alertes quotidiennes à 8h00 tous les jours
+        $schedule->command('alerts:daily')
+            ->dailyAt('08:00')
+            ->timezone('Africa/Casablanca')
+            ->withoutOverlapping();
+
+        // Envoyer le résumé quotidien à 18h00 tous les jours
+        $schedule->command('alerts:daily-summary')
+            ->dailyAt('18:00')
+            ->timezone('Africa/Casablanca')
+            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
