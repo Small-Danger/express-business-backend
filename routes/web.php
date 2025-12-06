@@ -69,14 +69,25 @@ Route::get('/test-telegram', function () {
                 'message' => $testMessage,
             ];
             
-            // Test via TelegramService
+            // Test via TelegramService avec débogage
             $telegramService = app(\App\Services\TelegramService::class);
+            
+            // Vérifier le token dans le service
+            $reflection = new \ReflectionClass($telegramService);
+            $botTokenProperty = $reflection->getProperty('botToken');
+            $botTokenProperty->setAccessible(true);
+            $serviceToken = $botTokenProperty->getValue($telegramService);
+            
             $sendResult = $telegramService->sendToConfiguredChats($testMessage);
             
             $result['test_2_sendMessage_viaService'] = [
                 'status' => $sendResult ? 'SUCCESS' : 'FAILED',
                 'chat_id' => $chatId,
                 'message' => $testMessage,
+                'service_token_prefix' => $serviceToken ? substr($serviceToken, 0, 20) . '...' : 'NULL',
+                'service_token_length' => $serviceToken ? strlen($serviceToken) : 0,
+                'token_matches' => $serviceToken === $botToken,
+                'check_logs' => 'Vérifiez storage/logs/laravel.log pour les erreurs détaillées',
             ];
         } else {
             $result['test_2_sendMessage'] = [
@@ -105,6 +116,24 @@ Route::get('/test-telegram', function () {
             'file' => $e->getFile(),
             'line' => $e->getLine(),
             'trace' => $e->getTraceAsString(),
+        ], 500);
+    }
+});
+
+// Route pour vider le cache (à supprimer après les tests)
+Route::get('/clear-cache', function () {
+    try {
+        \Artisan::call('config:clear');
+        \Artisan::call('cache:clear');
+        return response()->json([
+            'success' => true,
+            'message' => 'Cache vidé avec succès',
+            'output' => \Artisan::output(),
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
         ], 500);
     }
 });

@@ -118,13 +118,25 @@ class TelegramService
     private function sendSingleMessage($chatId, string $message, ?string $parseMode = null): bool
     {
         try {
-            $response = Http::timeout(10)->post("{$this->apiUrl}/sendMessage", [
+            $url = "{$this->apiUrl}/sendMessage";
+            
+            Log::debug('TelegramService: Envoi message', [
+                'url' => str_replace($this->botToken, 'TOKEN_MASKED', $url),
+                'chat_id' => $chatId,
+                'message_length' => mb_strlen($message),
+                'has_token' => !empty($this->botToken),
+            ]);
+            
+            $response = Http::timeout(10)->post($url, [
                 'chat_id' => $chatId,
                 'text' => $message,
                 'parse_mode' => $parseMode,
             ]);
 
             if ($response->successful() && $response->json('ok')) {
+                Log::debug('TelegramService: Message envoyé avec succès', [
+                    'chat_id' => $chatId,
+                ]);
                 return true;
             }
 
@@ -134,8 +146,10 @@ class TelegramService
                 'response' => $errorResponse,
                 'chat_id' => $chatId,
                 'message_length' => mb_strlen($message),
+                'status_code' => $response->status(),
                 'error_code' => $errorResponse['error_code'] ?? null,
                 'description' => $errorResponse['description'] ?? null,
+                'url' => str_replace($this->botToken, 'TOKEN_MASKED', $url),
             ]);
 
             return false;
@@ -143,6 +157,8 @@ class TelegramService
             Log::error('Exception lors de l\'envoi Telegram', [
                 'message' => $e->getMessage(),
                 'chat_id' => $chatId,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
