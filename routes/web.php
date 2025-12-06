@@ -46,21 +46,36 @@ Route::get('/test-telegram', function () {
             ],
         ];
 
-        // Test 2: Envoyer un message de test
+        // Test 2: Envoyer un message de test (test direct avec Http)
         $envChatId = env('TELEGRAM_CHAT_ID');
         $configChatId = config('services.telegram.chat_id');
         $chatId = $configChatId ?? $envChatId;
         
         if ($chatId) {
-            $telegramService = app(\App\Services\TelegramService::class);
             $testMessage = '🧪 Test Telegram depuis Laravel - ' . now()->format('d/m/Y H:i:s');
             
-            $sendResult = $telegramService->sendToConfiguredChats($testMessage);
+            // Test direct avec Http pour voir l'erreur exacte
+            $directSendResponse = Http::timeout(10)->post("https://api.telegram.org/bot{$botToken}/sendMessage", [
+                'chat_id' => $chatId,
+                'text' => $testMessage,
+            ]);
             
-            $result['test_2_sendMessage'] = [
-                'status' => $sendResult ? 'SUCCESS' : 'FAILED',
+            $result['test_2_sendMessage_direct'] = [
+                'status' => $directSendResponse->successful() && $directSendResponse->json('ok') ? 'SUCCESS' : 'FAILED',
+                'status_code' => $directSendResponse->status(),
+                'response' => $directSendResponse->json(),
                 'chat_id' => $chatId,
                 'chat_id_source' => $configChatId ? 'config' : ($envChatId ? 'env' : 'none'),
+                'message' => $testMessage,
+            ];
+            
+            // Test via TelegramService
+            $telegramService = app(\App\Services\TelegramService::class);
+            $sendResult = $telegramService->sendToConfiguredChats($testMessage);
+            
+            $result['test_2_sendMessage_viaService'] = [
+                'status' => $sendResult ? 'SUCCESS' : 'FAILED',
+                'chat_id' => $chatId,
                 'message' => $testMessage,
             ];
         } else {
