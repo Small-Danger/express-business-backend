@@ -73,7 +73,7 @@ Route::get('/test-telegram', function () {
         }
         
         // Test 3: Test direct avec le token depuis l'URL (pour comparer)
-        $hardcodedToken = '8441163675:AAEmzelljLYwNGvb9ZFmNZ9vT7-8LCXF09A';
+        $hardcodedToken = '8441163675:AAEmzeIIjLYwNGvb9ZFmNZ9vT7-8LCXf09A';
         $directTestResponse = Http::timeout(10)->get("https://api.telegram.org/bot{$hardcodedToken}/getMe");
         
         $result['test_3_hardcodedToken'] = [
