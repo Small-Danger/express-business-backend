@@ -42,24 +42,55 @@ class SendDailySummary extends Command
     {
         try {
             Log::info('SendDailySummary: Démarrage de la commande');
+            
             // Écrire aussi dans un fichier pour déboguer
             file_put_contents(storage_path('logs/daily-summary-debug.log'), date('Y-m-d H:i:s') . " - Démarrage\n", FILE_APPEND);
             
-            // Vérifier la connexion à la base de données
-            try {
-                \DB::connection()->getPdo();
-                Log::info('SendDailySummary: Connexion DB OK');
-            } catch (\Exception $e) {
-                $errorMsg = '❌ Impossible de se connecter à la base de données : ' . $e->getMessage();
-                $this->error($errorMsg);
-                Log::error('SendDailySummary: Erreur connexion DB', [
-                    'message' => $e->getMessage(),
-                    'host' => config('database.connections.pgsql.host'),
-                ]);
-                file_put_contents(storage_path('logs/daily-summary-debug.log'), 
-                    date('Y-m-d H:i:s') . " - ERREUR DB: " . $e->getMessage() . "\n", 
-                    FILE_APPEND);
-                return Command::FAILURE;
+            // Vérifier la connexion à la base de données avec retry
+            // Si on est en phase de build, la DB n'est pas disponible - on skip silencieusement
+            $dbConnected = false;
+            for ($i = 0; $i < 3; $i++) {
+                try {
+                    \DB::connection()->getPdo();
+                    $dbConnected = true;
+                    Log::info('SendDailySummary: Connexion DB OK');
+                    break;
+                } catch (\Exception $e) {
+                    // Vérifier si c'est une erreur de résolution DNS (typique pendant le build)
+                    $errorMessage = $e->getMessage();
+                    if (str_contains($errorMessage, 'could not translate host name') || 
+                        str_contains($errorMessage, 'Name or service not known')) {
+                        
+                        // Si on est probablement en phase de build, on skip silencieusement
+                        // pour ne pas faire échouer le build
+                        if ($i === 0) {
+                            $this->info('⏭️  Base de données non disponible (probablement pendant le build), skip de la commande');
+                            Log::info('SendDailySummary: DB non disponible, skip (probable build phase)');
+                            return Command::SUCCESS;
+                        }
+                    }
+                    
+                    if ($i < 2) {
+                        sleep(2);
+                        try {
+                            \DB::reconnect();
+                        } catch (\Exception $reconnectException) {
+                            // Ignorer les erreurs de reconnexion
+                        }
+                        continue;
+                    }
+                    // Si après 3 tentatives, la DB n'est toujours pas accessible
+                    $errorMsg = '❌ Impossible de se connecter à la base de données après 3 tentatives : ' . $e->getMessage();
+                    $this->error($errorMsg);
+                    Log::error('SendDailySummary: Erreur connexion DB', [
+                        'message' => $e->getMessage(),
+                        'host' => config('database.connections.pgsql.host'),
+                    ]);
+                    file_put_contents(storage_path('logs/daily-summary-debug.log'), 
+                        date('Y-m-d H:i:s') . " - ERREUR DB: " . $e->getMessage() . "\n", 
+                        FILE_APPEND);
+                    return Command::FAILURE;
+                }
             }
             
             if (!$this->telegramService->isConfigured()) {
