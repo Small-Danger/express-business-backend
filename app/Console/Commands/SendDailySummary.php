@@ -45,6 +45,23 @@ class SendDailySummary extends Command
             // Écrire aussi dans un fichier pour déboguer
             file_put_contents(storage_path('logs/daily-summary-debug.log'), date('Y-m-d H:i:s') . " - Démarrage\n", FILE_APPEND);
             
+            // Vérifier la connexion à la base de données
+            try {
+                \DB::connection()->getPdo();
+                Log::info('SendDailySummary: Connexion DB OK');
+            } catch (\Exception $e) {
+                $errorMsg = '❌ Impossible de se connecter à la base de données : ' . $e->getMessage();
+                $this->error($errorMsg);
+                Log::error('SendDailySummary: Erreur connexion DB', [
+                    'message' => $e->getMessage(),
+                    'host' => config('database.connections.pgsql.host'),
+                ]);
+                file_put_contents(storage_path('logs/daily-summary-debug.log'), 
+                    date('Y-m-d H:i:s') . " - ERREUR DB: " . $e->getMessage() . "\n", 
+                    FILE_APPEND);
+                return Command::FAILURE;
+            }
+            
             if (!$this->telegramService->isConfigured()) {
                 $this->warn('Telegram n\'est pas configuré. Vérifiez TELEGRAM_BOT_TOKEN et TELEGRAM_CHAT_ID dans .env');
                 Log::warning('SendDailySummary: Telegram non configuré');
@@ -59,14 +76,18 @@ class SendDailySummary extends Command
             Log::info("SendDailySummary: Date du jour = {$today->format('Y-m-d')}");
             file_put_contents(storage_path('logs/daily-summary-debug.log'), date('Y-m-d H:i:s') . " - Date: {$today->format('Y-m-d')}\n", FILE_APPEND);
 
-            // Compter l'activité du jour
+            // Compter l'activité du jour avec retry en cas d'erreur de connexion
             Log::info('SendDailySummary: Comptage des commandes');
-            $newOrders = BusinessOrder::whereDate('created_at', $today->toDateString())->count();
+            $newOrders = $this->retryDbQuery(function() use ($today) {
+                return BusinessOrder::whereDate('created_at', $today->toDateString())->count();
+            });
             Log::info("SendDailySummary: {$newOrders} nouvelles commandes");
             file_put_contents(storage_path('logs/daily-summary-debug.log'), date('Y-m-d H:i:s') . " - Commandes: {$newOrders}\n", FILE_APPEND);
             
             Log::info('SendDailySummary: Comptage des colis');
-            $newParcels = ExpressParcel::whereDate('created_at', $today->toDateString())->count();
+            $newParcels = $this->retryDbQuery(function() use ($today) {
+                return ExpressParcel::whereDate('created_at', $today->toDateString())->count();
+            });
             Log::info("SendDailySummary: {$newParcels} nouveaux colis");
             file_put_contents(storage_path('logs/daily-summary-debug.log'), date('Y-m-d H:i:s') . " - Colis: {$newParcels}\n", FILE_APPEND);
             
@@ -77,26 +98,34 @@ class SendDailySummary extends Command
 
             // Compter les dettes
             Log::info('SendDailySummary: Comptage des dettes');
-            $ordersWithDebt = BusinessOrder::where('has_debt', true)->count();
+            $ordersWithDebt = $this->retryDbQuery(function() {
+                return BusinessOrder::where('has_debt', true)->count();
+            });
             Log::info("SendDailySummary: {$ordersWithDebt} commandes avec dette");
             
-            $totalDebt = BusinessOrder::where('has_debt', true)
-                ->get()
-                ->sum(function ($order) {
-                    return ($order->total_amount ?? 0) - ($order->total_paid ?? 0);
-                });
+            $totalDebt = $this->retryDbQuery(function() {
+                return BusinessOrder::where('has_debt', true)
+                    ->get()
+                    ->sum(function ($order) {
+                        return ($order->total_amount ?? 0) - ($order->total_paid ?? 0);
+                    });
+            });
             Log::info("SendDailySummary: Dette totale = {$totalDebt}");
 
             // Compter les trajets qui partent bientôt
             Log::info('SendDailySummary: Comptage des trajets');
-            $convoysDeparting = BusinessConvoy::where('status', 'planned')
-                ->whereBetween('planned_departure_date', [$today->toDateString(), $today->copy()->addDays(7)->toDateString()])
-                ->count();
+            $convoysDeparting = $this->retryDbQuery(function() use ($today) {
+                return BusinessConvoy::where('status', 'planned')
+                    ->whereBetween('planned_departure_date', [$today->toDateString(), $today->copy()->addDays(7)->toDateString()])
+                    ->count();
+            });
             Log::info("SendDailySummary: {$convoysDeparting} convois Business qui partent bientôt");
             
-            $tripsDeparting = ExpressTrip::where('status', 'planned')
-                ->whereBetween('planned_date', [$today->toDateString(), $today->copy()->addDays(7)->toDateString()])
-                ->count();
+            $tripsDeparting = $this->retryDbQuery(function() use ($today) {
+                return ExpressTrip::where('status', 'planned')
+                    ->whereBetween('planned_date', [$today->toDateString(), $today->copy()->addDays(7)->toDateString()])
+                    ->count();
+            });
             Log::info("SendDailySummary: {$tripsDeparting} trajets Express qui partent bientôt");
 
             // Générer le message
@@ -127,8 +156,12 @@ class SendDailySummary extends Command
                 $message .= "   • " . number_format($totalRevenue, 0, ',', ' ') . " MAD de revenus\n\n";
                 
                 $message .= "📊 Statistiques :\n";
-                $message .= "   • Commandes en cours : " . BusinessOrder::where('status', '!=', 'cancelled')->count() . "\n";
-                $message .= "   • Colis en transit : " . ExpressParcel::where('status', 'in_transit')->count() . "\n";
+                $message .= "   • Commandes en cours : " . $this->retryDbQuery(function() {
+                    return BusinessOrder::where('status', '!=', 'cancelled')->count();
+                }) . "\n";
+                $message .= "   • Colis en transit : " . $this->retryDbQuery(function() {
+                    return ExpressParcel::where('status', 'in_transit')->count();
+                }) . "\n";
                 
                 if ($ordersWithDebt > 0) {
                     $message .= "   • Dettes totales : " . number_format($totalDebt, 0, ',', ' ') . " MAD ({$ordersWithDebt} commande(s))\n";
@@ -207,24 +240,28 @@ class SendDailySummary extends Command
     {
         try {
             // Revenus des commandes Business créées aujourd'hui
-            $ordersRevenue = BusinessOrder::whereDate('created_at', $today->toDateString())
-                ->get()
-                ->sum(function ($order) {
-                    return $order->total_amount ?? 0;
-                });
+            $ordersRevenue = $this->retryDbQuery(function() use ($today) {
+                return BusinessOrder::whereDate('created_at', $today->toDateString())
+                    ->get()
+                    ->sum(function ($order) {
+                        return $order->total_amount ?? 0;
+                    });
+            });
 
             // Revenus des colis Express créés aujourd'hui
-            $parcelsRevenue = ExpressParcel::whereDate('created_at', $today->toDateString())
-                ->get()
-                ->sum(function ($parcel) {
-                    if (($parcel->price_mad ?? 0) > 0) {
-                        return $parcel->price_mad;
-                    }
-                    if (($parcel->price_cfa ?? 0) > 0) {
-                        return $parcel->price_cfa / 63; // Conversion simple
-                    }
-                    return 0;
-                });
+            $parcelsRevenue = $this->retryDbQuery(function() use ($today) {
+                return ExpressParcel::whereDate('created_at', $today->toDateString())
+                    ->get()
+                    ->sum(function ($parcel) {
+                        if (($parcel->price_mad ?? 0) > 0) {
+                            return $parcel->price_mad;
+                        }
+                        if (($parcel->price_cfa ?? 0) > 0) {
+                            return $parcel->price_cfa / 63; // Conversion simple
+                        }
+                        return 0;
+                    });
+            });
 
             return $ordersRevenue + $parcelsRevenue;
         } catch (\Exception $e) {
@@ -233,5 +270,54 @@ class SendDailySummary extends Command
             ]);
             return 0;
         }
+    }
+
+    /**
+     * Réessayer une requête DB en cas d'erreur de connexion
+     * Utile pour gérer les problèmes de résolution DNS temporaires
+     */
+    private function retryDbQuery(callable $callback, int $maxRetries = 3, int $delaySeconds = 2)
+    {
+        $attempt = 0;
+        $lastException = null;
+
+        while ($attempt < $maxRetries) {
+            try {
+                return $callback();
+            } catch (\Exception $e) {
+                $lastException = $e;
+                $attempt++;
+                
+                // Vérifier si c'est une erreur de connexion
+                $errorMessage = $e->getMessage();
+                if (
+                    str_contains($errorMessage, 'could not translate host name') ||
+                    str_contains($errorMessage, 'Connection refused') ||
+                    str_contains($errorMessage, 'Name or service not known')
+                ) {
+                    if ($attempt < $maxRetries) {
+                        Log::warning("SendDailySummary: Erreur de connexion DB (tentative {$attempt}/{$maxRetries}), retry dans {$delaySeconds}s", [
+                            'error' => $errorMessage,
+                        ]);
+                        sleep($delaySeconds);
+                        // Réessayer la connexion
+                        try {
+                            \DB::reconnect();
+                        } catch (\Exception $reconnectException) {
+                            Log::warning("SendDailySummary: Échec reconnexion DB", [
+                                'error' => $reconnectException->getMessage(),
+                            ]);
+                        }
+                        continue;
+                    }
+                }
+                
+                // Si ce n'est pas une erreur de connexion ou qu'on a épuisé les tentatives, throw
+                throw $e;
+            }
+        }
+
+        // Si on arrive ici, toutes les tentatives ont échoué
+        throw $lastException ?? new \Exception('Erreur inconnue lors de la requête DB');
     }
 }
