@@ -7,45 +7,50 @@ use Illuminate\Support\Facades\Log;
 
 class TelegramService
 {
-    protected $botToken;
-    protected $apiUrl;
+    private string $botToken;
+    private string $chatId;
 
     public function __construct()
     {
-        // Utiliser config() au lieu de env() pour supporter le cache de config
-        $this->botToken = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
-        $this->apiUrl = "https://api.telegram.org/bot{$this->botToken}";
-        
-        if (empty($this->botToken)) {
-            Log::warning('TELEGRAM_BOT_TOKEN n\'est pas configuré. Vérifiez config/services.php ou .env');
+        // Toujours utiliser env() directement pour Railway (config() peut ne pas être rechargé dans les jobs)
+        $this->botToken = env('TELEGRAM_BOT_TOKEN', '');
+        $this->chatId = env('TELEGRAM_CHAT_ID', '');
+
+        if (empty($this->botToken) || empty($this->chatId)) {
+            Log::warning('TelegramService : token ou chat_id manquant.', [
+                'has_token' => !empty($this->botToken),
+                'has_chat_id' => !empty($this->chatId),
+            ]);
         }
+    }
+
+    /**
+     * URL de l'API Telegram
+     */
+    private function apiUrl(string $method): string
+    {
+        return "https://api.telegram.org/bot{$this->botToken}/{$method}";
     }
 
     /**
      * Envoyer un message à un chat Telegram
      * Gère automatiquement la limite de 4096 caractères en découpant le message
      *
-     * @param string|array $chatId ID du chat ou tableau d'IDs pour envoyer à plusieurs personnes
      * @param string $message Message à envoyer
-     * @param string|null $parseMode Mode de parsing (HTML ou Markdown)
+     * @param string|null $chatId ID du chat (optionnel, utilise celui de .env si non fourni)
+     * @param string $parseMode Mode de parsing (HTML par défaut pour éviter les problèmes)
      * @return bool
      */
-    public function sendMessage($chatId, string $message, ?string $parseMode = null): bool
+    public function sendMessage(string $message, ?string $chatId = null, string $parseMode = 'HTML'): bool
     {
-        if (!$this->botToken) {
-            Log::warning('TELEGRAM_BOT_TOKEN n\'est pas configuré dans .env');
-            return false;
-        }
+        $targetChatId = $chatId ?? $this->chatId;
 
-        // Si plusieurs chat_ids (tableau), envoyer à chacun
-        if (is_array($chatId)) {
-            $success = true;
-            foreach ($chatId as $id) {
-                if (!$this->sendMessage($id, $message, $parseMode)) {
-                    $success = false;
-                }
-            }
-            return $success;
+        if (empty($this->botToken) || empty($targetChatId)) {
+            Log::warning('TelegramService : impossible d\'envoyer le message, config manquante.', [
+                'has_token' => !empty($this->botToken),
+                'has_chat_id' => !empty($targetChatId),
+            ]);
+            return false;
         }
 
         // Telegram limite à 4096 caractères - découper si nécessaire
@@ -54,7 +59,7 @@ class TelegramService
 
         $allSuccess = true;
         foreach ($messages as $chunk) {
-            if (!$this->sendSingleMessage($chatId, $chunk, $parseMode)) {
+            if (!$this->sendSingleMessage($targetChatId, $chunk, $parseMode)) {
                 $allSuccess = false;
             }
             // Petite pause entre les messages pour éviter les rate limits
@@ -115,51 +120,41 @@ class TelegramService
     /**
      * Envoyer un seul message (utilisé en interne)
      */
-    private function sendSingleMessage($chatId, string $message, ?string $parseMode = null): bool
+    private function sendSingleMessage(string $chatId, string $message, string $parseMode): bool
     {
         try {
-            $url = "{$this->apiUrl}/sendMessage";
-            
-            Log::debug('TelegramService: Envoi message', [
-                'url' => str_replace($this->botToken, 'TOKEN_MASKED', $url),
-                'chat_id' => $chatId,
-                'message_length' => mb_strlen($message),
-                'has_token' => !empty($this->botToken),
-            ]);
-            
-            $response = Http::timeout(10)->post($url, [
+            $response = Http::timeout(10)->post($this->apiUrl('sendMessage'), [
                 'chat_id' => $chatId,
                 'text' => $message,
                 'parse_mode' => $parseMode,
             ]);
 
             if ($response->successful() && $response->json('ok')) {
-                Log::debug('TelegramService: Message envoyé avec succès', [
+                Log::debug('TelegramService : message envoyé avec succès', [
                     'chat_id' => $chatId,
+                    'message_length' => mb_strlen($message),
                 ]);
                 return true;
             }
 
-            // Logger les erreurs Telegram avec plus de détails
+            // Logger les erreurs Telegram
             $errorResponse = $response->json();
-            Log::error('Erreur Telegram API', [
+            Log::error('TelegramService : erreur Telegram', [
                 'response' => $errorResponse,
+                'status' => $response->status(),
                 'chat_id' => $chatId,
                 'message_length' => mb_strlen($message),
-                'status_code' => $response->status(),
                 'error_code' => $errorResponse['error_code'] ?? null,
                 'description' => $errorResponse['description'] ?? null,
-                'url' => str_replace($this->botToken, 'TOKEN_MASKED', $url),
             ]);
 
             return false;
         } catch (\Exception $e) {
-            Log::error('Exception lors de l\'envoi Telegram', [
+            Log::error('TelegramService Exception', [
                 'message' => $e->getMessage(),
                 'chat_id' => $chatId,
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
             return false;
@@ -167,11 +162,27 @@ class TelegramService
     }
 
     /**
-     * Envoyer un message formaté avec HTML
+     * Envoyer un message aux chats configurés dans .env
+     * Supporte plusieurs chat_ids séparés par des virgules
      */
-    public function sendHtmlMessage($chatId, string $message): bool
+    public function sendToConfiguredChats(string $message, string $parseMode = 'HTML'): bool
     {
-        return $this->sendMessage($chatId, $message, 'HTML');
+        if (empty($this->chatId)) {
+            Log::warning('TELEGRAM_CHAT_ID n\'est pas configuré.');
+            return false;
+        }
+
+        // Supporter plusieurs chat_ids séparés par des virgules
+        $chatIds = array_map('trim', explode(',', $this->chatId));
+
+        $allSuccess = true;
+        foreach ($chatIds as $chatId) {
+            if (!$this->sendMessage($message, $chatId, $parseMode)) {
+                $allSuccess = false;
+            }
+        }
+
+        return $allSuccess;
     }
 
     /**
@@ -179,26 +190,14 @@ class TelegramService
      */
     public function isConfigured(): bool
     {
-        $chatId = config('services.telegram.chat_id') ?? env('TELEGRAM_CHAT_ID');
-        return !empty($this->botToken) && !empty($chatId);
+        return !empty($this->botToken) && !empty($this->chatId);
     }
 
     /**
-     * Envoyer un message aux chats configurés dans .env
+     * Envoyer un message formaté avec HTML (méthode de compatibilité)
      */
-    public function sendToConfiguredChats(string $message, ?string $parseMode = null): bool
+    public function sendHtmlMessage(string $message, ?string $chatId = null): bool
     {
-        // Utiliser config() au lieu de env() pour supporter le cache de config
-        $chatIds = config('services.telegram.chat_id') ?? env('TELEGRAM_CHAT_ID');
-        
-        if (!$chatIds) {
-            Log::warning('TELEGRAM_CHAT_ID n\'est pas configuré. Vérifiez config/services.php ou .env');
-            return false;
-        }
-
-        // Supporter plusieurs chat_ids séparés par des virgules
-        $chatIdArray = array_map('trim', explode(',', $chatIds));
-
-        return $this->sendMessage($chatIdArray, $message, $parseMode);
+        return $this->sendMessage($message, $chatId, 'HTML');
     }
 }

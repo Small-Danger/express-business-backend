@@ -78,16 +78,32 @@ Route::get('/test-telegram', function () {
             $botTokenProperty->setAccessible(true);
             $serviceToken = $botTokenProperty->getValue($telegramService);
             
+            // Test 2a: sendMessage direct avec chat_id spécifié
+            $directServiceResult = $telegramService->sendMessage($testMessage, $chatId);
+            
+            // Test 2b: sendMessage sans chat_id (utilise celui de .env)
+            $noChatIdResult = $telegramService->sendMessage($testMessage);
+            
+            // Test 2c: sendToConfiguredChats
             $sendResult = $telegramService->sendToConfiguredChats($testMessage);
             
             $result['test_2_sendMessage_viaService'] = [
-                'status' => $sendResult ? 'SUCCESS' : 'FAILED',
-                'chat_id' => $chatId,
-                'message' => $testMessage,
+                'test_2a_sendMessage_with_chatId' => [
+                    'status' => $directServiceResult ? 'SUCCESS' : 'FAILED',
+                    'chat_id' => $chatId,
+                    'description' => 'sendMessage avec chat_id explicite',
+                ],
+                'test_2b_sendMessage_default_chatId' => [
+                    'status' => $noChatIdResult ? 'SUCCESS' : 'FAILED',
+                    'description' => 'sendMessage utilisant chat_id de .env',
+                ],
+                'test_2c_sendToConfiguredChats' => [
+                    'status' => $sendResult ? 'SUCCESS' : 'FAILED',
+                    'description' => 'sendToConfiguredChats (méthode principale)',
+                ],
                 'service_token_prefix' => $serviceToken ? substr($serviceToken, 0, 20) . '...' : 'NULL',
                 'service_token_length' => $serviceToken ? strlen($serviceToken) : 0,
                 'token_matches' => $serviceToken === $botToken,
-                'check_logs' => 'Vérifiez storage/logs/laravel.log pour les erreurs détaillées',
             ];
         } else {
             $result['test_2_sendMessage'] = [
