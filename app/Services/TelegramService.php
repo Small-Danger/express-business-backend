@@ -12,12 +12,18 @@ class TelegramService
 
     public function __construct()
     {
-        $this->botToken = env('TELEGRAM_BOT_TOKEN');
+        // Utiliser config() au lieu de env() pour supporter le cache de config
+        $this->botToken = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
         $this->apiUrl = "https://api.telegram.org/bot{$this->botToken}";
+        
+        if (empty($this->botToken)) {
+            Log::warning('TELEGRAM_BOT_TOKEN n\'est pas configuré. Vérifiez config/services.php ou .env');
+        }
     }
 
     /**
      * Envoyer un message à un chat Telegram
+     * Gère automatiquement la limite de 4096 caractères en découpant le message
      *
      * @param string|array $chatId ID du chat ou tableau d'IDs pour envoyer à plusieurs personnes
      * @param string $message Message à envoyer
@@ -42,6 +48,75 @@ class TelegramService
             return $success;
         }
 
+        // Telegram limite à 4096 caractères - découper si nécessaire
+        $maxLength = 4096;
+        $messages = $this->splitMessage($message, $maxLength);
+
+        $allSuccess = true;
+        foreach ($messages as $chunk) {
+            if (!$this->sendSingleMessage($chatId, $chunk, $parseMode)) {
+                $allSuccess = false;
+            }
+            // Petite pause entre les messages pour éviter les rate limits
+            if (count($messages) > 1) {
+                usleep(500000); // 0.5 seconde
+            }
+        }
+
+        return $allSuccess;
+    }
+
+    /**
+     * Découper un message long en plusieurs morceaux
+     */
+    private function splitMessage(string $message, int $maxLength): array
+    {
+        if (mb_strlen($message) <= $maxLength) {
+            return [$message];
+        }
+
+        $chunks = [];
+        $lines = explode("\n", $message);
+        $currentChunk = '';
+
+        foreach ($lines as $line) {
+            // Si une seule ligne dépasse la limite, la tronquer
+            if (mb_strlen($line) > $maxLength) {
+                if (!empty($currentChunk)) {
+                    $chunks[] = $currentChunk;
+                    $currentChunk = '';
+                }
+                // Tronquer la ligne trop longue
+                $chunks[] = mb_substr($line, 0, $maxLength - 10) . '...';
+                continue;
+            }
+
+            // Vérifier si on peut ajouter cette ligne au chunk actuel
+            if (mb_strlen($currentChunk . $line . "\n") <= $maxLength) {
+                $currentChunk .= $line . "\n";
+            } else {
+                // Le chunk actuel est plein, le sauvegarder et commencer un nouveau
+                if (!empty($currentChunk)) {
+                    $chunks[] = rtrim($currentChunk);
+                    $currentChunk = '';
+                }
+                $currentChunk = $line . "\n";
+            }
+        }
+
+        // Ajouter le dernier chunk s'il n'est pas vide
+        if (!empty($currentChunk)) {
+            $chunks[] = rtrim($currentChunk);
+        }
+
+        return $chunks;
+    }
+
+    /**
+     * Envoyer un seul message (utilisé en interne)
+     */
+    private function sendSingleMessage($chatId, string $message, ?string $parseMode = null): bool
+    {
         try {
             $response = Http::timeout(10)->post("{$this->apiUrl}/sendMessage", [
                 'chat_id' => $chatId,
@@ -53,9 +128,14 @@ class TelegramService
                 return true;
             }
 
+            // Logger les erreurs Telegram avec plus de détails
+            $errorResponse = $response->json();
             Log::error('Erreur Telegram API', [
-                'response' => $response->json(),
+                'response' => $errorResponse,
                 'chat_id' => $chatId,
+                'message_length' => mb_strlen($message),
+                'error_code' => $errorResponse['error_code'] ?? null,
+                'description' => $errorResponse['description'] ?? null,
             ]);
 
             return false;
@@ -63,6 +143,7 @@ class TelegramService
             Log::error('Exception lors de l\'envoi Telegram', [
                 'message' => $e->getMessage(),
                 'chat_id' => $chatId,
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return false;
@@ -82,7 +163,8 @@ class TelegramService
      */
     public function isConfigured(): bool
     {
-        return !empty($this->botToken) && !empty(env('TELEGRAM_CHAT_ID'));
+        $chatId = config('services.telegram.chat_id') ?? env('TELEGRAM_CHAT_ID');
+        return !empty($this->botToken) && !empty($chatId);
     }
 
     /**
@@ -90,10 +172,11 @@ class TelegramService
      */
     public function sendToConfiguredChats(string $message, ?string $parseMode = null): bool
     {
-        $chatIds = env('TELEGRAM_CHAT_ID');
+        // Utiliser config() au lieu de env() pour supporter le cache de config
+        $chatIds = config('services.telegram.chat_id') ?? env('TELEGRAM_CHAT_ID');
         
         if (!$chatIds) {
-            Log::warning('TELEGRAM_CHAT_ID n\'est pas configuré dans .env');
+            Log::warning('TELEGRAM_CHAT_ID n\'est pas configuré. Vérifiez config/services.php ou .env');
             return false;
         }
 
