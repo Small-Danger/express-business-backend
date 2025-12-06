@@ -79,10 +79,24 @@ class SendDailyAlerts extends Command
             }
         }
 
-        if ($sentCount > 0) {
-            $this->info("✅ {$sentCount} alerte(s) envoyée(s) avec succès");
+        // Si aucune alerte, envoyer un message de confirmation
+        if ($sentCount === 0) {
+            $today = Carbon::today('Africa/Casablanca');
+            $noAlertsMessage = "✅ Aucune alerte pour aujourd'hui ({$today->format('d/m/Y')})\n\n";
+            $noAlertsMessage .= "📊 Statut :\n";
+            $noAlertsMessage .= "   • Aucun trajet qui part dans 1, 3 ou 7 jours\n";
+            $noAlertsMessage .= "   • Aucune dette impayée\n";
+            $noAlertsMessage .= "   • Aucun colis en attente de récupération\n\n";
+            $noAlertsMessage .= "👋 Tout est sous contrôle !";
+            
+            if ($this->telegramService->sendToConfiguredChats($noAlertsMessage)) {
+                $this->info('✅ Message de confirmation envoyé (aucune alerte)');
+                $sentCount = 1;
+            } else {
+                $this->warn('⚠️ Aucune alerte à envoyer, mais erreur lors de l\'envoi du message de confirmation');
+            }
         } else {
-            $this->info('Aucune alerte à envoyer aujourd\'hui');
+            $this->info("✅ {$sentCount} alerte(s) envoyée(s) avec succès");
         }
 
         return Command::SUCCESS;
@@ -205,7 +219,7 @@ class SendDailyAlerts extends Command
      */
     private function checkPendingParcels(): ?string
     {
-        $threeDaysAgo = Carbon::now()->subDays(3);
+        $threeDaysAgo = Carbon::now('Africa/Casablanca')->subDays(3);
         
         $pendingParcels = ExpressParcel::where('status', 'ready_for_pickup')
             ->where('updated_at', '<=', $threeDaysAgo)
@@ -221,7 +235,7 @@ class SendDailyAlerts extends Command
         $parcelsList = [];
         foreach ($pendingParcels->take(5) as $parcel) {
             $clientName = $parcel->client ? $parcel->client->name : 'Client inconnu';
-            $daysPending = $parcel->updated_at->diffInDays(Carbon::now());
+            $daysPending = $parcel->updated_at->diffInDays(Carbon::now('Africa/Casablanca'));
             $parcelsList[] = "   • {$parcel->reference} - {$clientName} (depuis {$daysPending} jour(s))";
         }
         
