@@ -23,3 +23,4 @@ class TestTelegram extends Command
         return Command::FAILURE;
     }
 }
+

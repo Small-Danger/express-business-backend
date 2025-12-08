@@ -37,7 +37,14 @@ return [
 
     'telegram' => [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
-        'chat_id' => env('TELEGRAM_CHAT_ID'),
+        'chat_id' => env('TELEGRAM_CHAT_ID'), // Chat ID par défaut (pour compatibilité)
+        // Chat IDs par rôle (optionnel - si non défini, utilise TELEGRAM_CHAT_ID)
+        'chat_ids' => [
+            'admin' => env('TELEGRAM_CHAT_ID_ADMIN', env('TELEGRAM_CHAT_ID')),
+            'boss' => env('TELEGRAM_CHAT_ID_BOSS', env('TELEGRAM_CHAT_ID')),
+            'secretary' => env('TELEGRAM_CHAT_ID_SECRETARY', env('TELEGRAM_CHAT_ID')),
+            'traveler' => env('TELEGRAM_CHAT_ID_TRAVELER', env('TELEGRAM_CHAT_ID')),
+        ],
     ],
 
 ];

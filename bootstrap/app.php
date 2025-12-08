@@ -23,15 +23,15 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {
-        // Envoyer les alertes quotidiennes à 10h26 tous les jours (test temporaire)
+        // Envoyer les alertes quotidiennes à 8h00 tous les jours
         $schedule->command('alerts:daily')
-            ->dailyAt('18:15')
+            ->dailyAt('08:00')
             ->timezone('Africa/Casablanca')
             ->withoutOverlapping();
 
-        // Envoyer le résumé quotidien à 18h00 tous les jours (test temporaire)
+        // Envoyer le résumé quotidien à 18h00 tous les jours
         $schedule->command('alerts:daily-summary')
-            ->dailyAt('18:17')
+            ->dailyAt('18:00')
             ->timezone('Africa/Casablanca')
             ->withoutOverlapping();
     })
