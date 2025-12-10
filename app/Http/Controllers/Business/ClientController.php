@@ -199,9 +199,12 @@ class ClientController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
+            // Récupérer le client sans filtre de type (peut être Business, Express, ou les deux)
             $client = Client::where('id', $id)
-                ->where('is_business_client', true)
                 ->with(['businessOrders' => function ($query) {
+                    $query->orderBy('created_at', 'desc')->limit(10);
+                }])
+                ->with(['expressParcels' => function ($query) {
                     $query->orderBy('created_at', 'desc')->limit(10);
                 }])
                 ->withCount(['businessOrders', 'expressParcels'])
@@ -260,8 +263,8 @@ class ClientController extends Controller
         }
 
         try {
+            // Récupérer le client sans filtre de type (peut être Business, Express, ou les deux)
             $client = Client::where('id', $id)
-                ->where('is_business_client', true)
                 ->firstOrFail();
 
             $updateData = $request->only([
@@ -306,8 +309,8 @@ class ClientController extends Controller
     public function destroy(string $id): JsonResponse
     {
         try {
+            // Récupérer le client sans filtre de type (peut être Business, Express, ou les deux)
             $client = Client::where('id', $id)
-                ->where('is_business_client', true)
                 ->firstOrFail();
 
             // Vérifier si le client a des commandes
