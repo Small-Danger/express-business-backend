@@ -59,7 +59,7 @@ class ExpressWaveController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:255|unique:express_waves,code',
+            'code' => 'nullable|string|max:255|unique:express_waves,code',
             'start_date' => 'required|date',
             // end_date ne peut pas être définie à la création, elle est définie automatiquement lors de la clôture
             'status' => 'sometimes|string|in:open,closed',
@@ -75,9 +75,26 @@ class ExpressWaveController extends Controller
         }
 
         try {
+            // Générer le code automatiquement si non fourni
+            $code = $request->code;
+            if (empty($code)) {
+                // Générer un code unique basé sur le nom et la date
+                $baseCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $request->name), 0, 6));
+                $dateCode = date('Ymd');
+                $code = $baseCode . '-' . $dateCode;
+                
+                // Vérifier l'unicité et ajouter un suffixe si nécessaire
+                $counter = 1;
+                $originalCode = $code;
+                while (ExpressWave::where('code', $code)->exists()) {
+                    $code = $originalCode . '-' . $counter;
+                    $counter++;
+                }
+            }
+
             $wave = ExpressWave::create([
                 'name' => $request->name,
-                'code' => $request->code,
+                'code' => $code,
                 'start_date' => $request->start_date,
                 // end_date n'est pas définie à la création, elle sera définie automatiquement lors de la clôture
                 'end_date' => null,
