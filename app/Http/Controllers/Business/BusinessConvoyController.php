@@ -367,24 +367,31 @@ class BusinessConvoyController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
+        DB::beginTransaction();
         try {
             $convoy = BusinessConvoy::findOrFail($id);
 
-            // Vérifier si le convoi a des commandes
-            if ($convoy->orders()->count() > 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Impossible de supprimer ce convoi car il contient des commandes',
-                ], 422);
+            // Supprimer les transactions financières associées aux frais du convoi
+            $costIds = $convoy->costs()->pluck('id');
+            if ($costIds->isNotEmpty()) {
+                \App\Models\FinancialTransaction::where('related_type', 'BusinessConvoyCost')
+                    ->whereIn('related_id', $costIds)
+                    ->where('transaction_category', 'convoy_cost')
+                    ->delete();
             }
 
+            // Les frais seront supprimés en cascade grâce aux contraintes foreign key
+            // Les commandes garderont leur référence mais business_convoy_id sera mis à null (nullOnDelete)
             $convoy->delete();
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Convoi supprimé avec succès',
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la suppression du convoi',

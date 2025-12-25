@@ -368,24 +368,39 @@ class ExpressTripController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
+        DB::beginTransaction();
         try {
             $trip = ExpressTrip::findOrFail($id);
 
-            // Vérifier si le trajet a des colis
-            if ($trip->parcels()->count() > 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Impossible de supprimer ce trajet car il contient des colis',
-                ], 422);
+            // Supprimer les transactions financières associées aux colis du trajet
+            $parcelIds = $trip->parcels()->pluck('id');
+            if ($parcelIds->isNotEmpty()) {
+                \App\Models\FinancialTransaction::where('related_type', 'ExpressParcel')
+                    ->whereIn('related_id', $parcelIds)
+                    ->whereIn('transaction_category', ['parcel_deposit', 'parcel_pickup_payment'])
+                    ->delete();
             }
 
+            // Supprimer les transactions financières associées aux frais du trajet
+            $costIds = $trip->costs()->pluck('id');
+            if ($costIds->isNotEmpty()) {
+                \App\Models\FinancialTransaction::where('related_type', 'ExpressTripCost')
+                    ->whereIn('related_id', $costIds)
+                    ->where('transaction_category', 'trip_cost')
+                    ->delete();
+            }
+
+            // Les colis et frais seront supprimés en cascade grâce aux contraintes foreign key
             $trip->delete();
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Trajet supprimé avec succès',
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la suppression du trajet',
