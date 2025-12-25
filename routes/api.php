@@ -44,6 +44,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('users', UserController::class);
     });
 
+    // Journal d'activité (Admin uniquement)
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+        Route::get('/activity-logs/stats', [ActivityLogController::class, 'stats']);
+        Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show']);
+    });
+
     // Taux de change et devises (accessibles à tous les utilisateurs authentifiés)
     Route::get('/exchange-rate', [SystemSettingController::class, 'getExchangeRate']);
     Route::get('/secondary-currencies', [SystemSettingController::class, 'getSecondaryCurrencies']);
