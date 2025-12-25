@@ -88,13 +88,55 @@ class BusinessOrderController extends Controller
             'reference' => 'nullable|string|max:255|unique:business_orders,reference',
             'status' => 'sometimes|string|in:pending,confirmed,in_transit,arrived,ready_for_pickup,delivered,cancelled',
             'currency' => 'required|string|max:10',
+            'purchase_account_id' => 'nullable|exists:accounts,id',
             'total_paid' => 'sometimes|numeric|min:0',
+            'payments' => 'sometimes|array', // Paiements fractionnés (avances/dépôts) lors de la création
+            'payments.*.account_id' => 'required_with:payments|exists:accounts,id',
+            'payments.*.amount' => 'required_with:payments|numeric|min:0',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|required_without:items.*.product_name|exists:products,id',
             'items.*.product_name' => 'nullable|required_without:items.*.product_id|string|max:255',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.purchase_price' => 'required|numeric|min:0',
+        ], [
+            'client_id.required' => 'Le client est obligatoire. Veuillez sélectionner un client.',
+            'client_id.exists' => 'Le client sélectionné n\'existe pas. Veuillez sélectionner un client valide.',
+            'business_wave_id.required' => 'La vague est obligatoire. Veuillez sélectionner une vague.',
+            'business_wave_id.exists' => 'La vague sélectionnée n\'existe pas. Veuillez sélectionner une vague valide.',
+            'business_convoy_id.exists' => 'Le convoi sélectionné n\'existe pas. Veuillez sélectionner un convoi valide.',
+            'reference.string' => 'La référence doit être une chaîne de caractères.',
+            'reference.max' => 'La référence ne peut pas dépasser 255 caractères.',
+            'reference.unique' => 'Cette référence est déjà utilisée par une autre commande. Veuillez utiliser une référence différente.',
+            'status.string' => 'Le statut doit être une chaîne de caractères.',
+            'status.in' => 'Le statut doit être l\'un des suivants : en attente, confirmée, en transit, arrivée, prête pour retrait, livrée, annulée.',
+            'currency.required' => 'La devise est obligatoire. Veuillez sélectionner une devise (CFA, MAD, etc.).',
+            'currency.string' => 'La devise doit être une chaîne de caractères.',
+            'currency.max' => 'La devise ne peut pas dépasser 10 caractères.',
+            'purchase_account_id.exists' => 'Le compte d\'achat sélectionné n\'existe pas. Veuillez sélectionner un compte valide.',
+            'total_paid.numeric' => 'Le montant payé doit être un nombre.',
+            'total_paid.min' => 'Le montant payé ne peut pas être négatif.',
+            'payments.array' => 'Les paiements doivent être une liste.',
+            'payments.*.account_id.required_with' => 'Le compte est obligatoire pour chaque paiement.',
+            'payments.*.account_id.exists' => 'Le compte sélectionné n\'existe pas. Veuillez sélectionner un compte valide.',
+            'payments.*.amount.required_with' => 'Le montant est obligatoire pour chaque paiement.',
+            'payments.*.amount.numeric' => 'Le montant doit être un nombre.',
+            'payments.*.amount.min' => 'Le montant ne peut pas être négatif.',
+            'items.required' => 'Au moins un article est obligatoire. Veuillez ajouter au moins un produit à la commande.',
+            'items.array' => 'Les articles doivent être une liste.',
+            'items.min' => 'Au moins un article est obligatoire. Veuillez ajouter au moins un produit à la commande.',
+            'items.*.product_id.exists' => 'Le produit sélectionné n\'existe pas. Veuillez sélectionner un produit valide.',
+            'items.*.product_name.string' => 'Le nom du produit doit être une chaîne de caractères.',
+            'items.*.product_name.max' => 'Le nom du produit ne peut pas dépasser 255 caractères.',
+            'items.*.quantity.required' => 'La quantité est obligatoire pour chaque article.',
+            'items.*.quantity.integer' => 'La quantité doit être un nombre entier.',
+            'items.*.quantity.min' => 'La quantité doit être au moins 1.',
+            'items.*.unit_price.required' => 'Le prix unitaire est obligatoire pour chaque article.',
+            'items.*.unit_price.numeric' => 'Le prix unitaire doit être un nombre.',
+            'items.*.unit_price.min' => 'Le prix unitaire ne peut pas être négatif.',
+            'items.*.purchase_price.required' => 'Le prix d\'achat est obligatoire pour chaque article.',
+            'items.*.purchase_price.numeric' => 'Le prix d\'achat doit être un nombre.',
+            'items.*.purchase_price.min' => 'Le prix d\'achat ne peut pas être négatif.',
         ]);
 
         if ($validator->fails()) {
@@ -261,6 +303,80 @@ class BusinessOrderController extends Controller
                 'has_debt' => $hasDebt,
             ]);
 
+            // Créer la transaction DEBIT pour retirer le coût d'achat du compte d'achat
+            if ($order->purchase_account_id && $totalPurchaseCost > 0) {
+                try {
+                    $purchaseAccount = \App\Models\Account::findOrFail($order->purchase_account_id);
+                    
+                    // Convertir le coût d'achat vers la devise du compte si nécessaire
+                    $debitAmount = (float) $totalPurchaseCost;
+                    $orderCurrency = $order->currency ?? 'CFA';
+                    
+                    if ($orderCurrency !== $purchaseAccount->currency) {
+                        if ($orderCurrency === 'MAD' && $purchaseAccount->currency === 'CFA') {
+                            // Convertir MAD vers CFA
+                            $debitAmount = $this->currencyConverter->convertMadToCfa($debitAmount);
+                        } elseif ($orderCurrency === 'CFA' && $purchaseAccount->currency === 'MAD') {
+                            // Convertir CFA vers MAD
+                            $debitAmount = $this->currencyConverter->convertCfaToMad($debitAmount);
+                        }
+                    }
+                    
+                    $this->transactionService->createTransaction(
+                        $order->purchase_account_id,
+                        'debit',
+                        $debitAmount,
+                        $purchaseAccount->currency,
+                        'order_purchase',
+                        'BusinessOrder',
+                        $order->id,
+                        "Coût d'achat commande {$order->reference}"
+                    );
+                } catch (\Exception $e) {
+                    \Log::error("Erreur création transaction DEBIT pour coût d'achat commande {$order->id}: " . $e->getMessage());
+                    // Ne pas faire échouer la création de la commande si la transaction échoue
+                }
+            }
+
+            // Créer les transactions CREDIT pour les avances/dépôts reçus lors de la création
+            if (!empty($payments)) {
+                $orderCurrency = $order->currency ?? 'CFA';
+                
+                foreach ($payments as $payment) {
+                    if (isset($payment['account_id']) && isset($payment['amount']) && $payment['amount'] > 0) {
+                        try {
+                            $paymentAccount = \App\Models\Account::findOrFail($payment['account_id']);
+                            
+                            // Convertir le montant vers la devise du compte si nécessaire
+                            $creditAmount = (float) $payment['amount'];
+                            if ($orderCurrency !== $paymentAccount->currency) {
+                                if ($orderCurrency === 'MAD' && $paymentAccount->currency === 'CFA') {
+                                    // Convertir MAD vers CFA
+                                    $creditAmount = $this->currencyConverter->convertMadToCfa($creditAmount);
+                                } elseif ($orderCurrency === 'CFA' && $paymentAccount->currency === 'MAD') {
+                                    // Convertir CFA vers MAD
+                                    $creditAmount = $this->currencyConverter->convertCfaToMad($creditAmount);
+                                }
+                            }
+                            
+                            $this->transactionService->createTransaction(
+                                $payment['account_id'],
+                                'credit',
+                                $creditAmount,
+                                $paymentAccount->currency,
+                                'order_payment',
+                                'BusinessOrder',
+                                $order->id,
+                                "Avance reçue pour commande {$order->reference}"
+                            );
+                        } catch (\Exception $e) {
+                            \Log::error("Erreur création transaction CREDIT pour avance commande {$order->id}: " . $e->getMessage());
+                            // Ne pas faire échouer la création de la commande si la transaction échoue
+                        }
+                    }
+                }
+            }
+
             DB::commit();
 
             return response()->json([
@@ -316,6 +432,25 @@ class BusinessOrderController extends Controller
             'pickup_receiver_phone' => 'nullable|string|max:255',
             'pickup_receiver_id_number' => 'nullable|string|max:255',
             'pickup_receiver_note' => 'nullable|string',
+        ], [
+            'business_convoy_id.exists' => 'Le convoi sélectionné n\'existe pas. Veuillez sélectionner un convoi valide.',
+            'status.string' => 'Le statut doit être une chaîne de caractères.',
+            'status.in' => 'Le statut doit être l\'un des suivants : en attente, confirmée, en transit, arrivée, prête pour retrait, livrée, annulée.',
+            'total_paid.numeric' => 'Le montant payé doit être un nombre.',
+            'total_paid.min' => 'Le montant payé ne peut pas être négatif.',
+            'payments.array' => 'Les paiements doivent être une liste.',
+            'payments.*.account_id.required_with' => 'Le compte est obligatoire pour chaque paiement.',
+            'payments.*.account_id.exists' => 'Le compte sélectionné n\'existe pas. Veuillez sélectionner un compte valide.',
+            'payments.*.amount.required_with' => 'Le montant est obligatoire pour chaque paiement.',
+            'payments.*.amount.numeric' => 'Le montant doit être un nombre.',
+            'payments.*.amount.min' => 'Le montant ne peut pas être négatif.',
+            'pickup_receiver_name.string' => 'Le nom du réceptionnaire doit être une chaîne de caractères.',
+            'pickup_receiver_name.max' => 'Le nom du réceptionnaire ne peut pas dépasser 255 caractères.',
+            'pickup_receiver_phone.string' => 'Le téléphone du réceptionnaire doit être une chaîne de caractères.',
+            'pickup_receiver_phone.max' => 'Le téléphone du réceptionnaire ne peut pas dépasser 255 caractères.',
+            'pickup_receiver_id_number.string' => 'Le numéro de pièce d\'identité doit être une chaîne de caractères.',
+            'pickup_receiver_id_number.max' => 'Le numéro de pièce d\'identité ne peut pas dépasser 255 caractères.',
+            'pickup_receiver_note.string' => 'Les notes doivent être une chaîne de caractères.',
         ]);
 
         if ($validator->fails()) {

@@ -67,6 +67,24 @@ class ProductController extends Controller
             'sale_price' => 'required|numeric|min:0',
             'currency' => 'required|string|max:10',
             'is_active' => 'boolean',
+        ], [
+            'name.required' => 'Le nom du produit est obligatoire.',
+            'name.string' => 'Le nom du produit doit être une chaîne de caractères.',
+            'name.max' => 'Le nom du produit ne peut pas dépasser 255 caractères.',
+            'sku.string' => 'Le code SKU doit être une chaîne de caractères.',
+            'sku.max' => 'Le code SKU ne peut pas dépasser 255 caractères.',
+            'sku.unique' => 'Ce code SKU est déjà utilisé par un autre produit. Veuillez utiliser un code différent.',
+            'description.string' => 'La description doit être une chaîne de caractères.',
+            'purchase_price.required' => 'Le prix d\'achat est obligatoire.',
+            'purchase_price.numeric' => 'Le prix d\'achat doit être un nombre.',
+            'purchase_price.min' => 'Le prix d\'achat ne peut pas être négatif.',
+            'sale_price.required' => 'Le prix de vente est obligatoire.',
+            'sale_price.numeric' => 'Le prix de vente doit être un nombre.',
+            'sale_price.min' => 'Le prix de vente ne peut pas être négatif.',
+            'currency.required' => 'La devise est obligatoire.',
+            'currency.string' => 'La devise doit être une chaîne de caractères.',
+            'currency.max' => 'La devise ne peut pas dépasser 10 caractères.',
+            'is_active.boolean' => 'Le statut actif doit être vrai ou faux.',
         ]);
 
         if ($validator->fails()) {
@@ -178,6 +196,24 @@ class ProductController extends Controller
             'sale_price' => 'sometimes|required|numeric|min:0',
             'currency' => 'sometimes|required|string|max:10',
             'is_active' => 'boolean',
+        ], [
+            'name.required' => 'Le nom du produit est obligatoire.',
+            'name.string' => 'Le nom du produit doit être une chaîne de caractères.',
+            'name.max' => 'Le nom du produit ne peut pas dépasser 255 caractères.',
+            'sku.string' => 'Le code SKU doit être une chaîne de caractères.',
+            'sku.max' => 'Le code SKU ne peut pas dépasser 255 caractères.',
+            'sku.unique' => 'Ce code SKU est déjà utilisé par un autre produit. Veuillez utiliser un code différent.',
+            'description.string' => 'La description doit être une chaîne de caractères.',
+            'purchase_price.required' => 'Le prix d\'achat est obligatoire.',
+            'purchase_price.numeric' => 'Le prix d\'achat doit être un nombre.',
+            'purchase_price.min' => 'Le prix d\'achat ne peut pas être négatif.',
+            'sale_price.required' => 'Le prix de vente est obligatoire.',
+            'sale_price.numeric' => 'Le prix de vente doit être un nombre.',
+            'sale_price.min' => 'Le prix de vente ne peut pas être négatif.',
+            'currency.required' => 'La devise est obligatoire.',
+            'currency.string' => 'La devise doit être une chaîne de caractères.',
+            'currency.max' => 'La devise ne peut pas dépasser 10 caractères.',
+            'is_active.boolean' => 'Le statut actif doit être vrai ou faux.',
         ]);
 
         if ($validator->fails()) {

@@ -64,6 +64,18 @@ class ExpressWaveController extends Controller
             // end_date ne peut pas être définie à la création, elle est définie automatiquement lors de la clôture
             'status' => 'sometimes|string|in:open,closed',
             'notes' => 'nullable|string',
+        ], [
+            'name.required' => 'Le nom de la vague est obligatoire.',
+            'name.string' => 'Le nom de la vague doit être une chaîne de caractères.',
+            'name.max' => 'Le nom de la vague ne peut pas dépasser 255 caractères.',
+            'code.string' => 'Le code doit être une chaîne de caractères.',
+            'code.max' => 'Le code ne peut pas dépasser 255 caractères.',
+            'code.unique' => 'Ce code est déjà utilisé par une autre vague. Veuillez utiliser un code différent.',
+            'start_date.required' => 'La date de début est obligatoire. Veuillez sélectionner une date.',
+            'start_date.date' => 'La date de début doit être une date valide.',
+            'status.string' => 'Le statut doit être une chaîne de caractères.',
+            'status.in' => 'Le statut doit être l\'un des suivants : ouverte, clôturée.',
+            'notes.string' => 'Les notes doivent être une chaîne de caractères.',
         ]);
 
         if ($validator->fails()) {
@@ -158,6 +170,19 @@ class ExpressWaveController extends Controller
             // end_date ne peut pas être modifiée manuellement, elle est définie automatiquement lors de la clôture
             'status' => 'sometimes|string|in:open,closed',
             'notes' => 'nullable|string',
+        ], [
+            'name.required' => 'Le nom de la vague est obligatoire.',
+            'name.string' => 'Le nom de la vague doit être une chaîne de caractères.',
+            'name.max' => 'Le nom de la vague ne peut pas dépasser 255 caractères.',
+            'code.required' => 'Le code est obligatoire.',
+            'code.string' => 'Le code doit être une chaîne de caractères.',
+            'code.max' => 'Le code ne peut pas dépasser 255 caractères.',
+            'code.unique' => 'Ce code est déjà utilisé par une autre vague. Veuillez utiliser un code différent.',
+            'start_date.required' => 'La date de début est obligatoire. Veuillez sélectionner une date.',
+            'start_date.date' => 'La date de début doit être une date valide.',
+            'status.string' => 'Le statut doit être une chaîne de caractères.',
+            'status.in' => 'Le statut doit être l\'un des suivants : ouverte, clôturée.',
+            'notes.string' => 'Les notes doivent être une chaîne de caractères.',
         ]);
 
         if ($validator->fails()) {

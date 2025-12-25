@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -10,6 +11,13 @@ use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
+    protected $activityLogService;
+
+    public function __construct(ActivityLogService $activityLogService)
+    {
+        $this->activityLogService = $activityLogService;
+    }
+
     /**
      * Connexion d'un utilisateur
      */
@@ -18,6 +26,11 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
             'password' => 'required|string',
+        ], [
+            'email.required' => 'L\'adresse email est obligatoire. Veuillez saisir votre adresse email.',
+            'email.email' => 'L\'adresse email n\'est pas valide. Veuillez saisir une adresse email correcte (exemple : nom@domaine.com).',
+            'password.required' => 'Le mot de passe est obligatoire. Veuillez saisir votre mot de passe.',
+            'password.string' => 'Le mot de passe doit être une chaîne de caractères.',
         ]);
 
         if ($validator->fails()) {
@@ -48,6 +61,9 @@ class AuthController extends Controller
             // Créer un token Sanctum
             $token = $user->createToken('auth-token')->plainTextToken;
 
+            // Logger la connexion
+            $this->activityLogService->logLogin($user->id, $request);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Connexion réussie',
@@ -77,8 +93,13 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         try {
+            $user = $request->user();
+            
+            // Logger la déconnexion avant de supprimer le token
+            $this->activityLogService->logLogout($user->id, $request);
+            
             // Supprimer le token actuel
-            $request->user()->currentAccessToken()->delete();
+            $user->currentAccessToken()->delete();
 
             return response()->json([
                 'success' => true,

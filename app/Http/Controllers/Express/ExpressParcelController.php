@@ -89,6 +89,35 @@ class ExpressParcelController extends Controller
             'payments.*.account_id' => 'required_with:payments|exists:accounts,id',
             'payments.*.amount' => 'required_with:payments|numeric|min:0',
             'status' => 'sometimes|string|in:registered,ready_for_departure,loaded,in_transit,arrived,ready_for_pickup,delivered,cancelled',
+        ], [
+            'client_id.required' => 'Le client expéditeur est obligatoire. Veuillez sélectionner un client.',
+            'client_id.exists' => 'Le client expéditeur sélectionné n\'existe pas. Veuillez sélectionner un client valide.',
+            'receiver_client_id.exists' => 'Le client receveur sélectionné n\'existe pas. Veuillez sélectionner un client valide.',
+            'express_trip_id.required' => 'Le trajet est obligatoire. Veuillez sélectionner un trajet.',
+            'express_trip_id.exists' => 'Le trajet sélectionné n\'existe pas. Veuillez sélectionner un trajet valide.',
+            'reference.string' => 'La référence doit être une chaîne de caractères.',
+            'reference.max' => 'La référence ne peut pas dépasser 255 caractères.',
+            'reference.unique' => 'Cette référence est déjà utilisée par un autre colis. Veuillez utiliser une référence différente.',
+            'description.string' => 'La description doit être une chaîne de caractères.',
+            'weight_kg.required' => 'Le poids est obligatoire. Veuillez saisir le poids du colis en kilogrammes.',
+            'weight_kg.numeric' => 'Le poids doit être un nombre.',
+            'weight_kg.min' => 'Le poids ne peut pas être négatif.',
+            'price_mad.required' => 'Le prix en MAD est obligatoire. Veuillez saisir le prix en dirhams.',
+            'price_mad.numeric' => 'Le prix en MAD doit être un nombre.',
+            'price_mad.min' => 'Le prix en MAD ne peut pas être négatif.',
+            'price_cfa.required' => 'Le prix en CFA est obligatoire. Veuillez saisir le prix en francs CFA.',
+            'price_cfa.numeric' => 'Le prix en CFA doit être un nombre.',
+            'price_cfa.min' => 'Le prix en CFA ne peut pas être négatif.',
+            'total_paid.numeric' => 'Le montant payé doit être un nombre.',
+            'total_paid.min' => 'Le montant payé ne peut pas être négatif.',
+            'payments.array' => 'Les paiements doivent être une liste.',
+            'payments.*.account_id.required_with' => 'Le compte est obligatoire pour chaque paiement.',
+            'payments.*.account_id.exists' => 'Le compte sélectionné n\'existe pas. Veuillez sélectionner un compte valide.',
+            'payments.*.amount.required_with' => 'Le montant est obligatoire pour chaque paiement.',
+            'payments.*.amount.numeric' => 'Le montant doit être un nombre.',
+            'payments.*.amount.min' => 'Le montant ne peut pas être négatif.',
+            'status.string' => 'Le statut doit être une chaîne de caractères.',
+            'status.in' => 'Le statut doit être l\'un des suivants : enregistré, prêt pour départ, chargé, en transit, arrivé, prêt pour retrait, livré, annulé.',
         ]);
 
         if ($validator->fails()) {
@@ -321,6 +350,20 @@ class ExpressParcelController extends Controller
             'price_cfa' => 'sometimes|numeric|min:0',
             'total_paid' => 'sometimes|numeric|min:0',
             'status' => 'sometimes|string|in:registered,ready_for_departure,loaded,in_transit,arrived,ready_for_pickup,delivered,cancelled',
+        ], [
+            'receiver_client_id.exists' => 'Le client receveur sélectionné n\'existe pas. Veuillez sélectionner un client valide.',
+            'express_trip_id.exists' => 'Le trajet sélectionné n\'existe pas. Veuillez sélectionner un trajet valide.',
+            'description.string' => 'La description doit être une chaîne de caractères.',
+            'weight_kg.numeric' => 'Le poids doit être un nombre.',
+            'weight_kg.min' => 'Le poids ne peut pas être négatif.',
+            'price_mad.numeric' => 'Le prix en MAD doit être un nombre.',
+            'price_mad.min' => 'Le prix en MAD ne peut pas être négatif.',
+            'price_cfa.numeric' => 'Le prix en CFA doit être un nombre.',
+            'price_cfa.min' => 'Le prix en CFA ne peut pas être négatif.',
+            'total_paid.numeric' => 'Le montant payé doit être un nombre.',
+            'total_paid.min' => 'Le montant payé ne peut pas être négatif.',
+            'status.string' => 'Le statut doit être une chaîne de caractères.',
+            'status.in' => 'Le statut doit être l\'un des suivants : enregistré, prêt pour départ, chargé, en transit, arrivé, prêt pour retrait, livré, annulé.',
         ]);
 
         if ($validator->fails()) {
@@ -424,6 +467,23 @@ class ExpressParcelController extends Controller
             'payments' => 'sometimes|array', // Paiements fractionnés lors du pickup
             'payments.*.account_id' => 'required_with:payments|exists:accounts,id',
             'payments.*.amount' => 'required_with:payments|numeric|min:0',
+        ], [
+            'pickup_receiver_name.required' => 'Le nom du réceptionnaire est obligatoire. Veuillez saisir le nom de la personne qui récupère le colis.',
+            'pickup_receiver_name.string' => 'Le nom du réceptionnaire doit être une chaîne de caractères.',
+            'pickup_receiver_name.max' => 'Le nom du réceptionnaire ne peut pas dépasser 255 caractères.',
+            'pickup_receiver_phone.string' => 'Le téléphone du réceptionnaire doit être une chaîne de caractères.',
+            'pickup_receiver_phone.max' => 'Le téléphone du réceptionnaire ne peut pas dépasser 255 caractères.',
+            'pickup_receiver_id_number.string' => 'Le numéro de pièce d\'identité doit être une chaîne de caractères.',
+            'pickup_receiver_id_number.max' => 'Le numéro de pièce d\'identité ne peut pas dépasser 255 caractères.',
+            'pickup_receiver_note.string' => 'Les notes doivent être une chaîne de caractères.',
+            'amount_paid.numeric' => 'Le montant payé doit être un nombre.',
+            'amount_paid.min' => 'Le montant payé ne peut pas être négatif.',
+            'payments.array' => 'Les paiements doivent être une liste.',
+            'payments.*.account_id.required_with' => 'Le compte est obligatoire pour chaque paiement.',
+            'payments.*.account_id.exists' => 'Le compte sélectionné n\'existe pas. Veuillez sélectionner un compte valide.',
+            'payments.*.amount.required_with' => 'Le montant est obligatoire pour chaque paiement.',
+            'payments.*.amount.numeric' => 'Le montant doit être un nombre.',
+            'payments.*.amount.min' => 'Le montant ne peut pas être négatif.',
         ]);
 
         if ($validator->fails()) {

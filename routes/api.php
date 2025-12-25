@@ -9,6 +9,9 @@ use App\Http\Controllers\Business\BusinessOrderController;
 use App\Http\Controllers\Business\BusinessWaveController;
 use App\Http\Controllers\Business\ClientController;
 use App\Http\Controllers\Business\InvoiceController;
+use App\Http\Controllers\Business\ReceiptController as BusinessReceiptController;
+use App\Http\Controllers\Business\PaymentController;
+use App\Http\Controllers\Express\ParcelPaymentController;
 use App\Http\Controllers\Business\ProductController;
 use App\Http\Controllers\Express\DeliveryController;
 use App\Http\Controllers\Express\ExpressParcelController;
@@ -16,11 +19,12 @@ use App\Http\Controllers\Express\ExpressTripController;
 use App\Http\Controllers\Express\ExpressWaveController;
 use App\Http\Controllers\Express\ExpressWaveCostController;
 use App\Http\Controllers\Express\ExpressTripCostController;
-use App\Http\Controllers\Express\ReceiptController;
+use App\Http\Controllers\Express\ReceiptController as ExpressReceiptController;
 use App\Http\Controllers\Express\TaskController;
 use App\Http\Controllers\Business\BusinessOrderItemController;
 use App\Http\Controllers\Business\BusinessWaveCostController;
 use App\Http\Controllers\Business\BusinessConvoyCostController;
+use App\Http\Controllers\ActivityLogController;
 use Illuminate\Support\Facades\Route;
 
 // Routes publiques (authentification)
@@ -99,6 +103,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/invoices/{id}/generate', [InvoiceController::class, 'generate']);
         Route::get('/invoices/{id}/preview', [InvoiceController::class, 'preview']);
 
+        // Reçus Business (tous les utilisateurs authentifiés)
+        Route::get('/receipts/{id}/generate', [BusinessReceiptController::class, 'generate']);
+        Route::get('/receipts/{id}/preview', [BusinessReceiptController::class, 'preview']);
+
+        // Paiements Business (tous les utilisateurs authentifiés)
+        Route::get('/orders/{id}/payments', [PaymentController::class, 'index']);
+        Route::post('/orders/{id}/payments', [PaymentController::class, 'store']);
+
         // Lignes de commande Business (tous les utilisateurs authentifiés)
         Route::apiResource('order-items', BusinessOrderItemController::class);
 
@@ -148,8 +160,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/parcels/{id}/pickup', [ExpressParcelController::class, 'pickup']);
 
         // Reçus Express (tous les utilisateurs authentifiés)
-        Route::get('/receipts/{id}/generate', [ReceiptController::class, 'generate']);
-        Route::get('/receipts/{id}/preview', [ReceiptController::class, 'preview']);
+        Route::get('/receipts/{id}/generate', [ExpressReceiptController::class, 'generate']);
+        Route::get('/receipts/{id}/preview', [ExpressReceiptController::class, 'preview']);
+
+        // Paiements Express (tous les utilisateurs authentifiés)
+        Route::get('/parcels/{id}/payments', [ParcelPaymentController::class, 'index']);
+        Route::post('/parcels/{id}/payments', [ParcelPaymentController::class, 'store']);
 
         // Frais Express (Boss et Admin uniquement)
         Route::middleware('role:boss,admin')->group(function () {

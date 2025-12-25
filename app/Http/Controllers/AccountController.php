@@ -113,6 +113,24 @@ class AccountController extends Controller
             'initial_balance' => 'sometimes|numeric|min:0',
             'notes' => 'nullable|string',
             'is_active' => 'sometimes|boolean',
+        ], [
+            'name.required' => 'Le nom du compte est obligatoire.',
+            'name.string' => 'Le nom du compte doit être une chaîne de caractères.',
+            'name.max' => 'Le nom du compte ne peut pas dépasser 255 caractères.',
+            'account_number.string' => 'Le numéro de compte doit être une chaîne de caractères.',
+            'account_number.max' => 'Le numéro de compte ne peut pas dépasser 255 caractères.',
+            'bank_name.string' => 'Le nom de la banque doit être une chaîne de caractères.',
+            'bank_name.max' => 'Le nom de la banque ne peut pas dépasser 255 caractères.',
+            'type.required' => 'Le type de compte est obligatoire. Veuillez sélectionner Orange Money ou CIH Bank.',
+            'type.string' => 'Le type de compte doit être une chaîne de caractères.',
+            'type.in' => 'Le type de compte doit être "Orange Money" ou "CIH Bank".',
+            'currency.required' => 'La devise est obligatoire. Veuillez sélectionner CFA ou MAD.',
+            'currency.string' => 'La devise doit être une chaîne de caractères.',
+            'currency.in' => 'La devise doit être "CFA" ou "MAD".',
+            'initial_balance.numeric' => 'Le solde initial doit être un nombre.',
+            'initial_balance.min' => 'Le solde initial ne peut pas être négatif.',
+            'notes.string' => 'Les notes doivent être une chaîne de caractères.',
+            'is_active.boolean' => 'Le statut actif doit être vrai ou faux.',
         ]);
 
         if ($validator->fails()) {
@@ -165,6 +183,21 @@ class AccountController extends Controller
             'initial_balance' => 'sometimes|numeric|min:0',
             'notes' => 'nullable|string',
             'is_active' => 'sometimes|boolean',
+        ], [
+            'name.string' => 'Le nom du compte doit être une chaîne de caractères.',
+            'name.max' => 'Le nom du compte ne peut pas dépasser 255 caractères.',
+            'account_number.string' => 'Le numéro de compte doit être une chaîne de caractères.',
+            'account_number.max' => 'Le numéro de compte ne peut pas dépasser 255 caractères.',
+            'bank_name.string' => 'Le nom de la banque doit être une chaîne de caractères.',
+            'bank_name.max' => 'Le nom de la banque ne peut pas dépasser 255 caractères.',
+            'type.string' => 'Le type de compte doit être une chaîne de caractères.',
+            'type.in' => 'Le type de compte doit être "Orange Money" ou "CIH Bank".',
+            'currency.string' => 'La devise doit être une chaîne de caractères.',
+            'currency.in' => 'La devise doit être "CFA" ou "MAD".',
+            'initial_balance.numeric' => 'Le solde initial doit être un nombre.',
+            'initial_balance.min' => 'Le solde initial ne peut pas être négatif.',
+            'notes.string' => 'Les notes doivent être une chaîne de caractères.',
+            'is_active.boolean' => 'Le statut actif doit être vrai ou faux.',
         ]);
 
         if ($validator->fails()) {

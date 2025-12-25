@@ -59,6 +59,20 @@ class UserController extends Controller
             'email' => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:8',
             'role' => 'required|string|in:admin,boss,secretary,traveler',
+        ], [
+            'name.required' => 'Le nom est obligatoire.',
+            'name.string' => 'Le nom doit être une chaîne de caractères.',
+            'name.max' => 'Le nom ne peut pas dépasser 255 caractères.',
+            'email.required' => 'L\'adresse email est obligatoire.',
+            'email.email' => 'L\'adresse email n\'est pas valide. Veuillez saisir une adresse email correcte (exemple : nom@domaine.com).',
+            'email.max' => 'L\'adresse email ne peut pas dépasser 255 caractères.',
+            'email.unique' => 'Cette adresse email est déjà utilisée par un autre utilisateur. Veuillez utiliser une adresse email différente.',
+            'password.required' => 'Le mot de passe est obligatoire.',
+            'password.string' => 'Le mot de passe doit être une chaîne de caractères.',
+            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'role.required' => 'Le rôle est obligatoire.',
+            'role.string' => 'Le rôle doit être une chaîne de caractères.',
+            'role.in' => 'Le rôle doit être l\'un des suivants : admin, boss, secretary, traveler.',
         ]);
 
         if ($validator->fails()) {
@@ -122,6 +136,19 @@ class UserController extends Controller
             'email' => 'sometimes|required|email|max:255|unique:users,email,' . $id,
             'password' => 'sometimes|nullable|string|min:8',
             'role' => 'sometimes|required|string|in:admin,boss,secretary,traveler',
+        ], [
+            'name.required' => 'Le nom est obligatoire.',
+            'name.string' => 'Le nom doit être une chaîne de caractères.',
+            'name.max' => 'Le nom ne peut pas dépasser 255 caractères.',
+            'email.required' => 'L\'adresse email est obligatoire.',
+            'email.email' => 'L\'adresse email n\'est pas valide. Veuillez saisir une adresse email correcte (exemple : nom@domaine.com).',
+            'email.max' => 'L\'adresse email ne peut pas dépasser 255 caractères.',
+            'email.unique' => 'Cette adresse email est déjà utilisée par un autre utilisateur. Veuillez utiliser une adresse email différente.',
+            'password.string' => 'Le mot de passe doit être une chaîne de caractères.',
+            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'role.required' => 'Le rôle est obligatoire.',
+            'role.string' => 'Le rôle doit être une chaîne de caractères.',
+            'role.in' => 'Le rôle doit être l\'un des suivants : admin, boss, secretary, traveler.',
         ]);
 
         if ($validator->fails()) {
