@@ -61,8 +61,15 @@ class AuthController extends Controller
             // Créer un token Sanctum
             $token = $user->createToken('auth-token')->plainTextToken;
 
-            // Logger la connexion
-            $this->activityLogService->logLogin($user->id, $request);
+            // Logger la connexion (non bloquant)
+            try {
+                $this->activityLogService->logLogin($user->id, $request);
+            } catch (\Exception $e) {
+                \Log::warning('Erreur lors du logging de la connexion', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
@@ -95,11 +102,18 @@ class AuthController extends Controller
         try {
             $user = $request->user();
             
-            // Logger la déconnexion avant de supprimer le token
-            $this->activityLogService->logLogout($user->id, $request);
-            
             // Supprimer le token actuel
             $user->currentAccessToken()->delete();
+            
+            // Logger la déconnexion (non bloquant)
+            try {
+                $this->activityLogService->logLogout($user->id, $request);
+            } catch (\Exception $e) {
+                \Log::warning('Erreur lors du logging de la déconnexion', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
