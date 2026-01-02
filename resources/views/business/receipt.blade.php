@@ -347,16 +347,23 @@
                 <div class="header-right">
                     <div class="logo-wrapper">
                         @php
-                            $logoPath = public_path('assets/logos/logo_business.jpg');
-                            if (!file_exists($logoPath)) {
-                                $logoPath = public_path('assets/logos/logo_express.jpg');
+                            // Essayer d'abord logo_business.png, puis logo_business.jpg
+                            $logoPath = null;
+                            $logoExtensions = ['png', 'jpg', 'jpeg'];
+                            foreach ($logoExtensions as $ext) {
+                                $testPath = public_path('assets/logos/logo_business.' . $ext);
+                                if (file_exists($testPath)) {
+                                    $logoPath = $testPath;
+                                    break;
+                                }
                             }
                             $logoBase64 = null;
-                            if (file_exists($logoPath)) {
+                            if ($logoPath) {
                                 try {
                                     $imageData = file_get_contents($logoPath);
                                     if ($imageData !== false) {
-                                        $logoBase64 = 'data:image/jpeg;base64,' . base64_encode($imageData);
+                                        $mimeType = mime_content_type($logoPath);
+                                        $logoBase64 = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
                                     }
                                 } catch (\Exception $e) {
                                     $logoBase64 = null;
