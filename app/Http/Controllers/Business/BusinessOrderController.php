@@ -107,7 +107,7 @@ class BusinessOrderController extends Controller
             'business_convoy_id.exists' => 'Le convoi sélectionné n\'existe pas. Veuillez sélectionner un convoi valide.',
             'reference.string' => 'La référence doit être une chaîne de caractères.',
             'reference.max' => 'La référence ne peut pas dépasser 255 caractères.',
-            'reference.unique' => 'Cette référence est déjà utilisée par une autre commande. Veuillez utiliser une référence différente.',
+            'reference.unique' => 'Cette référence existe déjà dans la base de données. Une commande avec cette référence a déjà été enregistrée. Veuillez vérifier votre liste de commandes ou utiliser une référence différente pour éviter les doublons.',
             'status.string' => 'Le statut doit être une chaîne de caractères.',
             'status.in' => 'Le statut doit être l\'un des suivants : en attente, confirmée, en transit, arrivée, prête pour retrait, livrée, annulée.',
             'currency.required' => 'La devise est obligatoire. Veuillez sélectionner une devise (CFA, MAD, etc.).',

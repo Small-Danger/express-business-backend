@@ -97,7 +97,7 @@ class ExpressParcelController extends Controller
             'express_trip_id.exists' => 'Le trajet sélectionné n\'existe pas. Veuillez sélectionner un trajet valide.',
             'reference.string' => 'La référence doit être une chaîne de caractères.',
             'reference.max' => 'La référence ne peut pas dépasser 255 caractères.',
-            'reference.unique' => 'Cette référence est déjà utilisée par un autre colis. Veuillez utiliser une référence différente.',
+            'reference.unique' => 'Cette référence existe déjà dans la base de données. Un colis Express avec cette référence a déjà été enregistré. Veuillez vérifier votre liste de colis ou utiliser une référence différente pour éviter les doublons.',
             'description.string' => 'La description doit être une chaîne de caractères.',
             'weight_kg.required' => 'Le poids est obligatoire. Veuillez saisir le poids du colis en kilogrammes.',
             'weight_kg.numeric' => 'Le poids doit être un nombre.',
