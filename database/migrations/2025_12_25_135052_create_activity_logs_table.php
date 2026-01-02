@@ -20,7 +20,7 @@ return new class extends Migration
             // Catégorie de l'action (auth, order, parcel, payment, transaction, etc.)
             $table->string('category', 50); // auth, order, parcel, payment, transaction, user, etc.
             // Type d'entité concernée (User, BusinessOrder, ExpressParcel, FinancialTransaction, etc.)
-            $table->string('related_type', 50)->nullable();
+            $table->string('related_type', 100)->nullable();
             // ID de l'entité concernée
             $table->unsignedBigInteger('related_id')->nullable();
             // Description de l'action
