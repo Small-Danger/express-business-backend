@@ -47,6 +47,7 @@ class AccountController extends Controller
                         'current_balance' => $balance,
                         'notes' => $account->notes,
                         'is_active' => $account->is_active,
+                        'has_transactions' => $account->transactions()->exists(),
                         'created_at' => $account->created_at,
                         'updated_at' => $account->updated_at,
                     ];
@@ -210,6 +211,13 @@ class AccountController extends Controller
 
         try {
             $account = Account::findOrFail($id);
+            if ($account->transactions()->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ce compte ne peut pas être modifié car des transactions existent déjà.',
+                ], 422);
+            }
+
             $account->update($request->only([
                 'name',
                 'account_number',
@@ -230,6 +238,35 @@ class AccountController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la mise à jour du compte',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Supprimer un compte
+     */
+    public function destroy(string $id): JsonResponse
+    {
+        try {
+            $account = Account::findOrFail($id);
+            if ($account->transactions()->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ce compte ne peut pas être supprimé car des transactions existent déjà.',
+                ], 422);
+            }
+
+            $account->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Compte supprimé avec succès',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la suppression du compte',
                 'error' => $e->getMessage(),
             ], 500);
         }
